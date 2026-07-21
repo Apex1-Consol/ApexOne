@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ApexU Programme Initiation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --navy:#1A365D;--navy2:#2D4A7A;--navy3:#10223B;
+  --red:#E03E15;--red2:#C2320E;--red-bg:#FFF0ED;
+  --gold:#D4A017;--gold2:#F0C040;
+  --success:#1B7A4A;--success-bg:#EDFBF3;
+  --grey:#A0AEC0;--grey-bg:#EDF1F7;
+  --muted:#718096;--body:#4A5568;--dark:#1E2533;
+  --border:#DEE5EF;--surface:#F8FAFC;--white:#FFFFFF;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+  --r:8px;--r2:12px;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+  --shadow2:0 4px 20px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100vh}
+#app{max-width:1180px;margin:0 auto;background:var(--surface);min-height:100vh;box-shadow:var(--shadow2)}
+
+#topbar{
+  background:linear-gradient(135deg,var(--navy3) 0%,var(--navy) 100%);
+  border-bottom:3px solid var(--red);
+  padding:18px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+}
+.brand h1{font-size:15pt;font-weight:800;color:#fff;letter-spacing:.1em;text-transform:uppercase}
+.brand span{font-size:8pt;color:var(--gold2);letter-spacing:.2em;text-transform:uppercase}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.overall-badge{font-family:var(--mono);font-size:9pt;color:#fff;background:rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.2)}
+
+.btn{padding:9px 16px;border-radius:var(--r);font-weight:700;font-size:9.5pt;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface)}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover{background:var(--navy2)}
+.btn.danger{color:var(--red2);border-color:var(--red-bg)}
+.btn.danger:hover{background:var(--red-bg)}
+.btn.gold{background:var(--gold2);color:var(--navy3);border-color:var(--gold2)}
+.btn.small{padding:6px 10px;font-size:8.5pt}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+#dashboard{padding:28px 32px}
+.dash-controls{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.dash-controls input[type=text]{flex:1;min-width:200px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt}
+.dash-controls select{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt;background:#fff}
+#cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.card:hover{border-color:var(--navy2);box-shadow:var(--shadow2)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card-title{font-weight:800;color:var(--navy);font-size:11.5pt}
+.card-sub{font-size:9pt;color:var(--muted);margin-top:2px}
+.card-status{font-size:7.5pt;font-weight:700;padding:3px 9px;border-radius:12px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.card-status.complete{background:var(--success-bg);color:var(--success)}
+.card-status.progress{background:var(--grey-bg);color:var(--muted)}
+.card-dots{display:flex;gap:5px;margin:12px 0;flex-wrap:wrap}
+.mini-dot{width:9px;height:9px;border-radius:50%;background:var(--grey)}
+.mini-dot.done{background:var(--success)}
+.card-meta{font-size:8.5pt;color:var(--muted);margin-bottom:12px}
+.card-meta b{color:var(--body)}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state h3{color:var(--navy);font-size:13pt;margin-bottom:8px}
+
+#formview{display:none}
+#tabs{display:flex;background:var(--navy2);overflow-x:auto}
+.tab-btn{
+  flex:1;min-width:130px;padding:14px 8px;background:none;border:none;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  color:rgba(255,255,255,.65);font-family:var(--font);border-bottom:3px solid transparent;
+}
+.tab-btn:hover{background:rgba(255,255,255,.06)}
+.tab-btn.active{color:#fff;border-bottom-color:var(--gold);background:rgba(255,255,255,.08)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--grey);box-shadow:0 0 0 3px rgba(160,174,192,.2)}
+.dot.done{background:var(--success);box-shadow:0 0 0 3px rgba(27,122,74,.25)}
+.tab-label{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center}
+.tab-count{font-size:7.5pt;color:rgba(255,255,255,.5);font-family:var(--mono)}
+
+#panel{padding:28px 32px}
+.stage-head{margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.stage-head h2{font-size:14pt;color:var(--navy);font-weight:800}
+.stage-head p{font-size:9.5pt;color:var(--muted);margin-top:4px}
+
+.field{margin-bottom:18px}
+.field label{display:block;font-size:9.5pt;font-weight:700;color:var(--body);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
+.field label .req{color:var(--red);margin-left:2px}
+.field input,.field select,.field textarea{
+  width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--r);
+  font-family:var(--font);font-size:10.5pt;color:var(--dark);background:#fff;transition:.15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--navy2);box-shadow:0 0 0 3px rgba(45,74,122,.12)}
+.field input.filled,.field select.filled{border-color:var(--success);background:var(--success-bg)}
+.field input.error{border-color:var(--red);background:var(--red-bg)}
+.field .errmsg{font-size:8.5pt;color:var(--red2);margin-top:5px;font-weight:600}
+.field textarea{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.notes-box{margin-top:24px;padding-top:18px;border-top:1px dashed var(--border)}
+.notes-box label{display:block;font-size:9.5pt;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
+
+#nav{display:flex;justify-content:space-between;padding:18px 32px;border-top:1px solid var(--border);background:#fff;flex-wrap:wrap;gap:10px}
+#summary{background:var(--gold2);color:var(--navy3);padding:10px 32px;font-size:9pt;font-weight:700;text-align:center;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--navy3);color:#fff;padding:10px 18px;border-radius:var(--r);font-size:9pt;font-weight:600;box-shadow:var(--shadow2);opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1}
+
+/* ROLLOUT SCHEDULE */
+.rollout-head-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin-bottom:20px}
+@media(max-width:640px){.rollout-head-grid{grid-template-columns:1fr}}
+.rollout-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding:14px;background:var(--grey-bg);border-radius:var(--r)}
+.rollout-toolbar .hint{font-size:8.5pt;color:var(--muted);flex:1;min-width:180px}
+.module-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:18px;overflow:hidden}
+.module-card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--navy);color:#fff}
+.module-card-head input{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 10px;border-radius:6px;font-family:var(--font);font-weight:700;font-size:10pt}
+.module-card-head input::placeholder{color:rgba(255,255,255,.5)}
+.module-progress{font-family:var(--mono);font-size:8.5pt;color:#fff;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:12px;white-space:nowrap}
+select.status-select{border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-family:var(--font);font-size:8pt;font-weight:700;background:#fff;width:100%}
+.module-credit{font-family:var(--mono);font-size:8.5pt;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:12px;white-space:nowrap}
+.subject-table-wrap{overflow-x:auto}
+table.subject-table{border-collapse:collapse;width:100%;min-width:1150px}
+table.subject-table th{background:var(--grey-bg);font-size:7.5pt;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:8px 6px;text-align:left;white-space:nowrap;border-bottom:1.5px solid var(--border)}
+table.subject-table td{padding:5px 6px;border-bottom:1px solid var(--border)}
+table.subject-table input{width:100%;min-width:90px;padding:6px 7px;border:1px solid var(--border);border-radius:5px;font-family:var(--font);font-size:9pt}
+table.subject-table input.wide{min-width:150px}
+table.subject-table input.narrow{min-width:55px}
+.module-card-foot{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--surface)}
+.rollout-final{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:16px;margin-top:8px}
+.rollout-final h3{font-size:10pt;color:var(--navy);margin-bottom:12px;text-transform:uppercase;letter-spacing:.03em}
+.rollout-final .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:640px){.rollout-final .grid3{grid-template-columns:1fr}}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(16,34,59,.6);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--surface);border-radius:var(--r2);max-width:1180px;width:100%;box-shadow:var(--shadow2)}
+.modal-box-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:22px 28px;background:var(--navy);border-radius:var(--r2) var(--r2) 0 0}
+.modal-box-head h2{color:#fff;font-size:14pt;font-weight:800}
+.modal-box-head p{color:rgba(255,255,255,.7);font-size:9pt;margin-top:4px;max-width:560px}
+.modal-box-body{padding:28px}
+.dropzone{border:2px dashed #CBD5E1;border-radius:10px;padding:18px 12px;text-align:center;cursor:pointer;background:#F8FAFC;transition:border-color .15s,background .15s}
+.dropzone:hover{border-color:#2D4A7A;background:#F0F4FA}
+.dropzone.dragover{border-color:#2D4A7A;background:#EAF0FA}
+.dropzone-icon{font-size:18px;color:#2D4A7A;margin-bottom:4px}
+.dropzone-text{font-size:9.5pt;color:#556}
+.dropzone-link{color:#2D4A7A;font-weight:700;text-decoration:underline}
+</style>
+
+<style id="apexone-shell-css">
+  #apexone-strip{position:sticky;top:0;z-index:5000;display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,#10223B 0%,#1A365D 100%);border-bottom:3px solid #E03E15;
+    padding:10px 20px;font-family:'Segoe UI',system-ui,sans-serif;flex-wrap:wrap;gap:8px;}
+  #apexone-strip .aos-brand{display:flex;align-items:center;gap:10px;}
+  #apexone-strip .aos-logo{width:28px;height:28px;background:linear-gradient(135deg,#D4A017,#B8860B);border-radius:7px;
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#1A365D;}
+  #apexone-strip .aos-name{font-size:14px;font-weight:800;color:#fff;letter-spacing:.03em;}
+  #apexone-strip .aos-appname{font-size:11px;color:#F0C040;font-weight:600;margin-left:6px;padding-left:10px;border-left:1px solid rgba(255,255,255,0.25);}
+  #apexone-strip .aos-links{display:flex;gap:6px;flex-wrap:wrap;}
+  #apexone-strip .aos-links a{color:rgba(255,255,255,0.75);text-decoration:none;font-size:12px;font-weight:600;
+    padding:6px 12px;border-radius:6px;transition:all .15s ease;}
+  #apexone-strip .aos-links a:hover{background:rgba(255,255,255,0.1);color:#fff;}
+  #apexone-strip .aos-links a.current{background:rgba(212,160,23,0.2);color:#F0C040;}
+  #apexone-guard-block{position:fixed;inset:0;background:#0B1220;color:#fff;display:flex;align-items:center;
+    justify-content:center;font-family:system-ui,sans-serif;z-index:9999;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+<div id="apexone-strip">
+  <div class="aos-brand"><div class="aos-logo">A</div><div class="aos-name">APEX U</div><div class="aos-appname">Programme Initiation</div></div>
+  <div class="aos-links"><a href="index.html" class="">Dashboard</a><a href="report-generator.html" class="" data-roles="admin,qa_specialist,etqa,project_manager,demo">Report Generator</a><a href="programme-initiation.html" class="current" data-roles="admin,pi_specialist,demo">Programme Initiation</a></div>
+</div>
+<div id="apexone-guard-block" style="display:none;">
+  <div><div style="font-size:40px;margin-bottom:12px;">&#128274;</div>
+  <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Checking access&hellip;</div>
+  <div id="apexone-guard-msg" style="font-size:13px;color:#94A3B8;"></div></div>
+</div>
+<script id="apexone-guard-script">
+(function(){
+  var ALLOWED = ['admin', 'pi_specialist', 'demo'];
+  function rolesToArray(r){ if(Array.isArray(r)) return r.filter(Boolean); if(typeof r==='string'&&r) return [r]; return ['operations']; }
+  function showBlock(msg){
+    document.getElementById('apexone-guard-block').style.display='flex';
+    document.getElementById('apexone-guard-msg').textContent = msg;
+  }
+  function waitForSupabaseLib(cb, tries){
+    tries = tries||0;
+    if (window.supabase && window.supabase.createClient) return cb();
+    if (tries > 100) return showBlock('Could not load the authentication library. Please refresh.');
+    setTimeout(function(){ waitForSupabaseLib(cb, tries+1); }, 50);
+  }
+  waitForSupabaseLib(function(){
+    try {
+      var guardClient = window.supabase.createClient('https://nducwhlmudksgxggjrbo.supabase.co','sb_publishable_G2BvFAbvXlrq9nwIl4Gupw_3qyTRe2b');
+      guardClient.auth.getSession().then(function(res){
+        var session = res.data && res.data.session;
+        if (!session) { window.location.href = 'index.html'; return; }
+        var user = session.user;
+        var rawRole = (user.app_metadata && user.app_metadata.role) || (user.user_metadata && user.user_metadata.role) || 'operations';
+        var roles = rolesToArray(rawRole);
+        document.querySelectorAll('#apexone-strip [data-roles]').forEach(function(el){
+          var allowed = el.dataset.roles.split(',').map(function(r){ return r.trim(); });
+          if (!roles.some(function(r){ return allowed.indexOf(r) !== -1; })) el.style.display = 'none';
+        });
+        var ok = roles.some(function(r){ return ALLOWED.indexOf(r) !== -1; });
+        if (!ok) {
+          showBlock('Your role (' + roles.join(', ') + ') does not have access to Programme Initiation. Redirecting to Dashboard\u2026');
+          setTimeout(function(){ window.location.href = 'index.html'; }, 2200);
+        }
+      }).catch(function(){ window.location.href = 'index.html'; });
+    } catch(e) { console.error('ApexOne guard error', e); }
+  });
+})();
+</script>
+
+<div id="authGate" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0B1220;font-family:'DM Sans',system-ui,sans-serif;">
+  <div style="background:#F8FAFC;border-radius:12px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.3);">
+    <h1 style="font-size:15pt;font-weight:800;color:#1A365D;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px;">ApexU</h1>
+    <p style="font-size:9pt;color:#718096;margin-bottom:22px;">Sign in to Programme Initiation</p>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">Email</label>
+      <input type="email" id="authEmail" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="username">
+    </div>
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">Password</label>
+      <input type="password" id="authPassword" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="current-password">
+    </div>
+    <div id="authError" style="display:none;color:#C2320E;font-size:8.5pt;margin-bottom:14px;"></div>
+    <button id="authSignInBtn" style="width:100%;padding:11px;border-radius:8px;background:#1A365D;color:#fff;border:none;font-weight:700;font-size:10pt;cursor:pointer;margin-bottom:8px;">Sign In</button>
+    <button id="authForgotBtn" style="width:100%;padding:9px;border-radius:8px;background:transparent;color:#1A365D;border:none;font-weight:600;font-size:9pt;cursor:pointer;text-decoration:underline;">Forgot password?</button>
+    <p id="authStatus" style="font-size:8.5pt;color:#1B7A4A;margin-top:12px;display:none;"></p>
+  </div>
+  <div id="authResetGate" style="display:none;background:#F8FAFC;border-radius:12px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.3);">
+    <h1 style="font-size:15pt;font-weight:800;color:#1A365D;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px;">ApexU</h1>
+    <p style="font-size:9pt;color:#718096;margin-bottom:22px;">Set a new password</p>
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">New password</label>
+      <input type="password" id="authNewPassword" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="new-password">
+    </div>
+    <div id="authResetError" style="display:none;color:#C2320E;font-size:8.5pt;margin-bottom:14px;"></div>
+    <button id="authResetSubmitBtn" style="width:100%;padding:11px;border-radius:8px;background:#1A365D;color:#fff;border:none;font-weight:700;font-size:10pt;cursor:pointer;">Update password</button>
+  </div>
+</div>
+<div id="app" style="display:none;">
+  <div id="topbar">
+    <div class="brand"><h1>ApexU</h1><span id="topbarSub">Programme Initiation</span></div>
+    <div class="topbar-actions" id="topbarActions"></div>
+  </div>
+
+  <div id="dashboard">
+    <div class="dash-controls">
+      <input type="text" id="searchBox" placeholder="Search by client, programme, or PM...">
+      <select id="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="complete">Complete</option>
+        <option value="progress">In progress</option>
+      </select>
+      <button class="btn primary" id="newBtn">+ New Programme</button>
+      <button class="btn gold" id="importProgrammesBtn">Import Programme Data (Excel)</button>
+      <button class="btn" id="exportAllBtn">Export All (CSV)</button>
+    </div>
+    <div id="cards"></div>
+  </div>
+
+  <div id="formview">
+    <div id="tabs"></div>
+    <div id="summary" style="display:none"></div>
+    <div id="panel"></div>
+    <div id="nav">
+      <div style="display:flex;gap:10px">
+        <button class="btn" id="backBtn">&larr; Dashboard</button>
+        <button class="btn" id="prevBtn">Previous</button>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn" id="copyBtn">Copy Summary</button>
+        <button class="btn gold" id="rolloutDocBtn">Rollout Document</button>
+        <button class="btn primary" id="nextBtn">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="rolloutFileInput" accept=".xlsx,.xls" style="display:none">
+<input type="file" id="programmeFileInput" accept=".xlsx,.xls" style="display:none">
+
+<div id="rolloutModalOverlay" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-box-head">
+      <div>
+        <h2>Rollout document</h2>
+        <p>This isn't a stage to complete — it's the final deliverable. Import a spreadsheet or enter modules manually, then download the finished schedule.</p>
+      </div>
+      <button class="btn small" id="rolloutModalClose">Close ✕</button>
+    </div>
+    <div class="modal-box-body" id="rolloutModalBody"></div>
+  </div>
+</div>
+
+<div id="previewModalOverlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:1300px">
+    <div class="modal-box-head">
+      <div>
+        <h2>Document preview</h2>
+        <p>This is exactly what will download. Check it over, then download the file.</p>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn small gold" id="previewDownloadBtn" style="color:var(--navy3)">Download</button>
+        <button class="btn small" id="previewModalClose">Close ✕</button>
+      </div>
+    </div>
+    <div class="modal-box-body" style="padding:16px">
+      <iframe id="rolloutPreviewFrame" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:var(--r);background:#fff"></iframe>
+    </div>
+  </div>
+</div>
+
+<div id="handoverModalOverlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-box-head">
+      <div>
+        <h2>Hand over to PM</h2>
+        <p>This writes the programme, learners, and enrolments to the live database and reassigns ownership to the PM.</p>
+      </div>
+      <button class="btn small" id="handoverModalClose">Close ✕</button>
+    </div>
+    <div class="modal-box-body" style="padding:16px">
+      <div class="field">
+        <label>Project Manager Email<span class="req">*</span></label>
+        <input type="email" id="handoverPmEmail" placeholder="pm@apexu.co.za">
+      </div>
+      <div id="handoverError" style="display:none;color:#c0392b;font-size:13px;margin-top:8px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+        <button class="btn" id="handoverCancelBtn">Cancel</button>
+        <button class="btn primary" id="handoverConfirmBtn">Confirm Hand Over</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- SUPABASE SETUP ---------- */
+const SUPABASE_URL = 'https://nducwhlmudksgxggjrbo.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_G2BvFAbvXlrq9nwIl4Gupw_3qyTRe2b';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* window.storage shim — backs the app's existing persistence calls with Supabase
+   instead of the Claude Artifacts storage API, so no other app code needs to change. */
+window.storage = {
+  async get(key){
+    const { data, error } = await supabaseClient.from('app_kv_store').select('value').eq('key', key).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return { key, value: data.value, shared: false };
+  },
+  async set(key, value){
+    const { error } = await supabaseClient.from('app_kv_store').upsert({ key, value, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    return { key, value, shared: false };
+  },
+  async delete(key){
+    const { error } = await supabaseClient.from('app_kv_store').delete().eq('key', key);
+    if (error) throw error;
+    return { key, deleted: true, shared: false };
+  },
+  async list(prefix){
+    let q = supabaseClient.from('app_kv_store').select('key');
+    if (prefix) q = q.like('key', prefix + '%');
+    const { data, error } = await q;
+    if (error) throw error;
+    return { keys: (data||[]).map(d=>d.key), prefix, shared: false };
+  }
+};
+
+/* ---------- AUTH GATE ---------- */
+function showApp(){
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  loadData();
+}
+async function doLogout(){
+  await supabaseClient.auth.signOut();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('authGate').style.display = 'flex';
+  document.getElementById('authResetGate').style.display = 'none';
+  document.getElementById('authGate').querySelector('div').style.display = '';
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+}
+function authErr(msg){
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+function authStatus(msg){
+  const el = document.getElementById('authStatus');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+document.getElementById('authSignInBtn').addEventListener('click', async ()=>{
+  authErr(''); authStatus('');
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!email || !password){ authErr('Enter email and password.'); return; }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){ authErr(error.message); return; }
+  showApp();
+});
+document.getElementById('authForgotBtn').addEventListener('click', async ()=>{
+  authErr(''); authStatus('');
+  const email = document.getElementById('authEmail').value.trim();
+  if(!email){ authErr('Enter your email above, then tap "Forgot password?" again.'); return; }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if(error){ authErr(error.message); return; }
+  authStatus('Check your email for a password reset link.');
+});
+
+/* ---------- PASSWORD RECOVERY FLOW ---------- */
+function showResetGate(){
+  document.getElementById('authGate').querySelector('div').style.display = 'none';
+  document.getElementById('authResetGate').style.display = '';
+}
+function resetErr(msg){
+  const el = document.getElementById('authResetError');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+document.getElementById('authResetSubmitBtn').addEventListener('click', async ()=>{
+  resetErr('');
+  const password = document.getElementById('authNewPassword').value;
+  if(!password || password.length < 6){ resetErr('Password must be at least 6 characters.'); return; }
+  const { error } = await supabaseClient.auth.updateUser({ password });
+  if(error){ resetErr(error.message); return; }
+  showApp();
+});
+supabaseClient.auth.onAuthStateChange((event, session)=>{
+  if(event === 'PASSWORD_RECOVERY'){ showResetGate(); }
+});
+(async function initAuth(){
+  const { data } = await supabaseClient.auth.getSession();
+  if(data.session && !window.location.hash.includes('type=recovery')){ showApp(); }
+})();
+
+/* ---------- STAGE DEFINITIONS ---------- */
+const APEXU_LOGO_B64 = "data:image/png;base64,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";
+
+const stages = [
+  { key:'client', label:'Client & Programme', desc:'Basic client and programme identification.',
+    fields:[
+      {id:'clientName', label:'Client Name', type:'text', required:true},
+      {id:'programmeName', label:'Programme Name', type:'text', required:true},
+      {id:'level', label:'Level', type:'text', required:true},
+      {id:'provider', label:'Provider', type:'select', options:['','Apex Academy','Catalyst','Pulse Afrika'], required:true},
+      {id:'employment', label:'Employment Status', type:'select', options:['','Employed','Unemployed'], required:true},
+      {id:'qualificationType', label:'Qualification Type', type:'select', options:['','Learnership','Skills Programme','Internship','Bursary','Other'], required:false},
+      {id:'qualificationSETA', label:'Qualification SETA', type:'text', required:false},
+      {id:'funding', label:'Un/Funded', type:'select', options:['','Funded','Unfunded'], required:false},
+      {id:'fundingOrganisation', label:'Funding Organisation', type:'text', required:false, showIf:d=>d.funding==='Funded'},
+      {id:'numLearners', label:'No. of Learners', type:'number', required:false},
+      {id:'numGroups', label:'No. of Groups', type:'number', required:false},
+      {id:'companyRegNumber', label:'Company Registration Number', type:'text', required:false},
+      {id:'clientSETA', label:'Client SETA', type:'text', required:false},
+      {id:'clientSDL', label:'Client SDL', type:'text', required:false},
+      {id:'relationshipManager', label:'Relationship Manager', type:'text', required:false, history:true},
+      {id:'clientContactNumber', label:'Client Contact Number', type:'text', required:false},
+      {id:'clientEmail', label:'Client Email', type:'text', required:false},
+      {id:'companyAddress', label:'Company Physical Address', type:'text', required:false}
+    ]},
+  { key:'delivery', label:'Delivery Setup', desc:'How and where training will be delivered.',
+    fields:[
+      {id:'deliveryMode', label:'Mode of Delivery', type:'select', options:['','Online','Physical','Blended'], required:true},
+      {id:'premises', label:'If Physical – Client or Apex Premises', type:'text', required:false,
+        showIf:d=>d.deliveryMode==='Physical'||d.deliveryMode==='Blended'},
+      {id:'examMode', label:'Mode of Exam/Assessment', type:'select', options:['','Online','Physical','Blended','N/A'], required:false},
+      {id:'facilitatorTravel', label:'Facilitator to Travel', type:'select', options:['','Yes','No'], required:false},
+      {id:'facilitationVenue', label:'Venue for Facilitation', type:'text', required:false},
+      {id:'hardcopyMaterial', label:'Hardcopy Study Material Needed', type:'select', options:['','Yes','No'], required:false},
+      {id:'facilitationTimeStart', label:'Facilitation Times Start', type:'text', required:false},
+      {id:'facilitationTimeEnd', label:'Facilitation Times End', type:'text', required:false}
+    ]},
+  { key:'team', label:'Team Assignment', desc:'People assigned to deliver and manage the programme.',
+    fields:[
+      {id:'projectManager', label:'Project Manager', type:'text', required:true, history:true},
+      {id:'facilitator', label:'Facilitator', type:'text', required:true, history:true},
+      {id:'assessor', label:'Assessor', type:'text', required:true, history:true},
+      {id:'moderator', label:'Moderator', type:'text', required:true, history:true},
+      {id:'academicAssociate', label:'Academic Associate', type:'text', required:false, history:true},
+      {id:'customization', label:'Customization', type:'select', options:['','Yes','No'], required:true}
+    ]},
+  { key:'schedule', label:'Schedule', desc:'Key dates for induction and training start.',
+    fields:[
+      {id:'inductionDate', label:'Induction Date', type:'date', required:true},
+      {id:'inductionTime', label:'Induction Time', type:'text', required:false},
+      {id:'inductionVenue', label:'Induction Venue', type:'text', required:false},
+      {id:'trainingStartDate', label:'Training Start Date', type:'date', required:true, afterField:'inductionDate'},
+      {id:'trainingEndDate', label:'Training End Date', type:'date', required:false, afterField:'trainingStartDate'}
+    ]},
+  { key:'recruitment', label:'Recruitment', desc:'Recruitment details, if applicable to this programme.',
+    fields:[
+      {id:'recruitment', label:'Recruitment (If Applicable)', type:'select', options:['','Yes','No','N/A'], required:true},
+      {id:'demographics', label:'Demographics', type:'text', required:false},
+      {id:'disabilityStatus', label:'Disability Status', type:'text', required:false},
+      {id:'preferredSkills', label:'Preferred Skills Learners Should Possess', type:'text', required:false},
+      {id:'stipendPaidBy', label:'Stipend Paid By', type:'text', required:false},
+      {id:'workOnClientPremises', label:'Does Client Want Learners to Work at Their Offices', type:'select', options:['','Yes','No'], required:false},
+      {id:'workDaysPerWeek', label:'If Yes, How Many Days', type:'text', required:false, showIf:d=>d.workOnClientPremises==='Yes'},
+      {id:'workplaceVenue', label:'Workplace Venue', type:'text', required:false},
+      {id:'learnerRoster', label:'Learner Roster (one full name per line)', type:'textarea', required:false}
+    ]},
+  { key:'documents', label:'Documents & Appendices', desc:'Compliance checklist for learner documentation.',
+    fields:[
+      {id:'idsReceived', label:'All Certified Identity Documents Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'qualificationsReceived', label:'All Certified Highest Qualifications Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'cvsReceived', label:'All Curriculum Vitaes Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'disabilityLettersReceived', label:'All Disability Letters Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'approvedScheduleReceived', label:'Approved Implementation Schedule', type:'select', options:['','Yes','No'], required:false},
+      {id:'learnerListReceived', label:'Learner List Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'learnerAgreementReceived', label:'Learner Agreement Received', type:'select', options:['','Yes','No'], required:false},
+      {id:'mieChecksCompleted', label:'MIE Checks Completed', type:'select', options:['','Yes','No'], required:false},
+      {id:'supportingDocuments', label:'Upload Supporting Documents', type:'file', required:false}
+    ]}
+];
+
+/* Default column schema — used for brand-new programmes started manually.
+   Imported programmes get their own schema detected from the spreadsheet (see parseRolloutRows). */
+const DEFAULT_SUBJECT_COLS = [
+  {id:'subjectCode', label:'Subject Code', cls:'narrow'},
+  {id:'module', label:'Unit / Module Title', cls:'wide'},
+  {id:'type', label:'Type', cls:'narrow'},
+  {id:'level', label:'Level', cls:'narrow'},
+  {id:'credits', label:'Credits', cls:'narrow'},
+  {id:'facilitation', label:'Facilitation', cls:''},
+  {id:'formativeSubmission', label:'Formative Submission', cls:''},
+  {id:'formativeResults', label:'Formative Results / Feedback', cls:''},
+  {id:'summativeSubmission', label:'Summative Submission', cls:''},
+  {id:'summativeResults', label:'Summative Results', cls:''},
+  {id:'remediationFeedback', label:'Remediation Feedback', cls:''},
+  {id:'remediationSubmission', label:'Remediation Submission', cls:''},
+  {id:'remedialResults', label:'Remedial Results', cls:''}
+];
+/* Column ids that describe the subject itself (rendered per-row).
+   Everything else is treated as a module-level milestone/date column (rendered once per module). */
+const SUBJECT_LEVEL_COL_IDS = ['subjectCode','module','type','level','credits'];
+function cloneDefaultCols(){ return JSON.parse(JSON.stringify(DEFAULT_SUBJECT_COLS)); }
+
+let programmes = [];
+let peopleHistory = {};
+let currentId = null;
+let activeTab = 0;
+let view = 'dashboard';
+let saveTimer = null;
+
+const STORAGE_KEY = 'programmes-v2';
+const HISTORY_KEY = 'people-history-v1';
+
+/* ---------- PERSISTENCE ---------- */
+async function loadData(){
+  try{
+    const r = await window.storage.get(STORAGE_KEY, false);
+    programmes = r ? JSON.parse(r.value) : [];
+  }catch(e){ programmes = []; }
+  try{
+    const r2 = await window.storage.get(HISTORY_KEY, false);
+    peopleHistory = r2 ? JSON.parse(r2.value) : {};
+  }catch(e){ peopleHistory = {}; }
+  programmes.forEach(ensureRollout);
+  renderDashboard();
+}
+
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(programmes), false);
+      await window.storage.set(HISTORY_KEY, JSON.stringify(peopleHistory), false);
+      showToast('Saved');
+    }catch(e){ showToast('Save failed'); }
+  }, 400);
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  const duration = Math.min(5000, Math.max(1600, msg.length * 45));
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(()=>t.classList.remove('show'), duration);
+}
+
+function ensureRollout(rec){
+  if(!rec.rollout){
+    rec.rollout = { qualificationTitle:'', inductionDate:'', inductionTime:'', modules:[], columns:cloneDefaultCols(), fisaDate:'', submissionDate:'', resultsDate:'', sourceMeta:null };
+  }
+  if(!rec.rollout.columns || !rec.rollout.columns.length){
+    // migration for records saved before per-programme column schemas existed
+    rec.rollout.columns = cloneDefaultCols();
+  }
+  if(rec.rollout.sourceMeta===undefined) rec.rollout.sourceMeta = null;
+}
+
+/* ---------- ORIGINAL-FILE FIDELITY (coordinate map + write-back) ----------
+   When a rollout is imported from Excel, we keep the exact source bytes (in
+   window.storage, keyed per-programme so the main record list stays small)
+   plus the sheet name every value was read from. Each parsed subject carries
+   its row index (_ri) and each column carries its column index (ci) from the
+   moment of parsing, so a value edited in the app can be written back into
+   the SAME cell of the SAME original workbook later — instead of the app
+   generating a look-alike document from scratch. */
+function arrayBufferToBase64(buf){
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunk = 0x8000;
+  for(let i=0; i<bytes.length; i+=chunk){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+function base64ToArrayBuffer(b64){
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+function rolloutSourceKey(recId){ return 'rollout-source:'+recId; }
+
+/* ---------- PROGRAMME CRUD ---------- */
+function newProgramme(){
+  const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const rec = { id, data:{}, notes:{}, rollout:{ qualificationTitle:'', inductionDate:'', inductionTime:'', modules:[], columns:cloneDefaultCols(), fisaDate:'', submissionDate:'', resultsDate:'', sourceMeta:null }, createdAt:Date.now(), updatedAt:Date.now() };
+  programmes.unshift(rec);
+  saveData();
+  openProgramme(id);
+}
+
+function cloneProgramme(id){
+  const src = programmes.find(p=>p.id===id);
+  if(!src) return;
+  const nid = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const clonedRollout = JSON.parse(JSON.stringify(src.rollout));
+  clonedRollout.sourceMeta = null; // the original workbook bytes live under the source programme's id, not this clone's
+  const clone = { id:nid, data:{...src.data}, notes:{...src.notes}, rollout:clonedRollout, createdAt:Date.now(), updatedAt:Date.now() };
+  programmes.unshift(clone);
+  saveData();
+  renderDashboard();
+  showToast('Cloned');
+}
+
+function deleteProgramme(id){
+  if(!confirm('Delete this programme record? This cannot be undone.')) return;
+  programmes = programmes.filter(p=>p.id!==id);
+  saveData();
+  renderDashboard();
+}
+
+function openProgramme(id){
+  currentId = id;
+  activeTab = 0;
+  view = 'form';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('formview').style.display = 'block';
+  renderTopbarActions();
+  renderForm();
+}
+
+function backToDashboard(){
+  view = 'dashboard';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('formview').style.display = 'none';
+  renderTopbarActions();
+  renderDashboard();
+}
+
+function renderTopbarActions(){
+  const el = document.getElementById('topbarActions');
+  const logoutBtn = '<button class="btn small" id="logoutBtn">Logout</button>';
+  if(view==='dashboard'){
+    el.innerHTML = `<div class="overall-badge">${programmes.length} programme${programmes.length===1?'':'s'}</div>${logoutBtn}`;
+  } else {
+    const rec = programmes.find(p=>p.id===currentId);
+    const done = rec ? stages.filter(s=>isStageComplete(rec,s)).length : 0;
+    el.innerHTML = `<div class="overall-badge" id="overallBadge">${done} / ${stages.length} stages complete</div>${logoutBtn}`;
+  }
+  document.getElementById('logoutBtn').addEventListener('click', doLogout);
+}
+
+/* ---------- COMPLETION LOGIC ---------- */
+function isStageComplete(rec, stage){
+  if(stage.rollout){
+    const ro = rec.rollout;
+    return !!(ro && ro.modules.length>0 && ro.modules.every(m=>m.subjects.length>0));
+  }
+  const data = rec.data;
+  const requiredFields = stage.fields.filter(f=>f.required && visibleField(f,data));
+  if(requiredFields.length===0){
+    const visibleFields = stage.fields.filter(f=>visibleField(f,data));
+    return visibleFields.length>0 && visibleFields.every(f=>data[f.id] && String(data[f.id]).trim()!=='');
+  }
+  return requiredFields.every(f=>data[f.id] && String(data[f.id]).trim()!=='');
+}
+function filledCount(rec, stage){
+  if(stage.rollout) return (rec.rollout ? rec.rollout.modules.length : 0);
+  const data = rec.data;
+  return stage.fields.filter(f=>visibleField(f,data) && data[f.id] && String(data[f.id]).trim()!=='').length;
+}
+function totalCount(rec, stage){
+  if(stage.rollout) return null;
+  const data = rec.data;
+  return stage.fields.filter(f=>visibleField(f,data)).length;
+}
+function visibleField(f, data){
+  return f.showIf ? f.showIf(data) : true;
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(){
+  renderTopbarActions();
+  const search = (document.getElementById('searchBox').value || '').toLowerCase();
+  const statusFilter = document.getElementById('statusFilter').value;
+  const cardsEl = document.getElementById('cards');
+
+  let list = programmes.filter(p=>{
+    const d = p.data;
+    const hay = [d.clientName,d.programmeName,d.projectManager].filter(Boolean).join(' ').toLowerCase();
+    const matchesSearch = !search || hay.includes(search);
+    const complete = stages.every(s=>isStageComplete(p,s));
+    const matchesStatus = statusFilter==='all' || (statusFilter==='complete'?complete:!complete);
+    return matchesSearch && matchesStatus;
+  });
+
+  if(list.length===0){
+    cardsEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <h3>No programmes yet</h3>
+      <p>Click "+ New Programme" to start your first initiation record.</p>
+    </div>`;
+    return;
+  }
+
+  cardsEl.innerHTML = '';
+  list.forEach(rec=>{
+    const d = rec.data;
+    const complete = stages.every(s=>isStageComplete(rec,s));
+    const doneCount = stages.filter(s=>isStageComplete(rec,s)).length;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <div class="card-title">${d.programmeName || 'Untitled Programme'}</div>
+          <div class="card-sub">${d.clientName || 'No client set'}</div>
+        </div>
+        <div class="card-status ${complete?'complete':'progress'}">${complete?'Ready':'In progress'}</div>
+      </div>
+      <div class="card-dots">${stages.map(s=>`<div class="mini-dot ${isStageComplete(rec,s)?'done':''}"></div>`).join('')}</div>
+      <div class="card-meta"><b>${doneCount}/${stages.length}</b> stages &middot; PM: <b>${d.projectManager||'—'}</b> &middot; Modules: <b>${(rec.rollout&&rec.rollout.modules.length)||0}</b></div>
+      <div class="card-actions">
+        <button class="btn small primary" data-act="open">Open</button>
+        <button class="btn small" data-act="clone">Clone</button>
+        <button class="btn small" data-act="copy">Copy</button>
+        <button class="btn small danger" data-act="delete">Delete</button>
+      </div>
+    `;
+    card.querySelector('[data-act=open]').onclick = e=>{ e.stopPropagation(); openProgramme(rec.id); };
+    card.querySelector('[data-act=clone]').onclick = e=>{ e.stopPropagation(); cloneProgramme(rec.id); };
+    card.querySelector('[data-act=copy]').onclick = e=>{ e.stopPropagation(); copySummary(rec); };
+    card.querySelector('[data-act=delete]').onclick = e=>{ e.stopPropagation(); deleteProgramme(rec.id); };
+    card.onclick = ()=>openProgramme(rec.id);
+    cardsEl.appendChild(card);
+  });
+}
+
+document.getElementById('searchBox').addEventListener('input', renderDashboard);
+document.getElementById('statusFilter').addEventListener('change', renderDashboard);
+document.getElementById('newBtn').addEventListener('click', newProgramme);
+document.getElementById('backBtn').addEventListener('click', backToDashboard);
+document.getElementById('exportAllBtn').addEventListener('click', exportAllCSV);
+document.getElementById('importProgrammesBtn').addEventListener('click', ()=>{
+  document.getElementById('programmeFileInput').value = '';
+  document.getElementById('programmeFileInput').click();
+});
+
+const IMPORT_FIELD_ALIASES = {
+  clientName:['client name','client'],
+  programmeName:['programme name','program name'],
+  level:['level'],
+  provider:['provider'],
+  employment:['un/employed','employment status','employment'],
+  deliveryMode:['online/physical','mode of delivery','delivery mode','delivery'],
+  premises:['if physical - client or apex premises','premises'],
+  projectManager:['project manager','project manger'],
+  facilitator:['facilitator'],
+  assessor:['assessor'],
+  moderator:['moderator'],
+  inductionDate:['induction date'],
+  trainingStartDate:['training start date'],
+  customization:['customization','customisation'],
+  academicAssociate:['academic associate'],
+  recruitment:['recruitment (if applicable)','recruitment'],
+  qualificationType:['qualification type'],
+  qualificationSETA:['qualification seta'],
+  funding:['un/funded','funding'],
+  fundingOrganisation:['funding organisation','funding organization'],
+  numLearners:['no. of learners','number of learners'],
+  numGroups:['no. of groups','number of groups'],
+  companyRegNumber:['company registration number'],
+  clientSETA:['client seta'],
+  clientSDL:['client sdl'],
+  relationshipManager:['relationship manager name','relationship manager'],
+  clientContactNumber:['contact number'],
+  clientEmail:['email'],
+  companyAddress:['company physical address'],
+  examMode:['mode of exam/assignm','mode of exam/assessment'],
+  facilitatorTravel:['facilitator to travel'],
+  facilitationVenue:['venue for facilitation'],
+  hardcopyMaterial:['hardcopy study material needed'],
+  facilitationTimeStart:['facilitation times start'],
+  facilitationTimeEnd:['facilitation times end'],
+  inductionTime:['induction time'],
+  inductionVenue:['venue for induction'],
+  trainingEndDate:['training end date'],
+  demographics:['demographics'],
+  disabilityStatus:['disability statuts','disability status'],
+  preferredSkills:['preferred skills learners should posses','preferred skills'],
+  stipendPaidBy:['stipend paid by'],
+  workOnClientPremises:['does client want learners to work at their offices'],
+  workDaysPerWeek:['if yes, how many days'],
+  workplaceVenue:['workplace venue'],
+  idsReceived:['all certified identity documents recieved','all certified identity documents received'],
+  qualificationsReceived:['all certified highest qualifications recieved','all certified highest qualifications received'],
+  cvsReceived:['all curriculum vitaes recived','all curriculum vitaes received'],
+  disabilityLettersReceived:['all disability letters recieved','all disability letters received'],
+  approvedScheduleReceived:['approved implementation schedule'],
+  learnerListReceived:['learner list received','learner list recieved'],
+  learnerAgreementReceived:['learner agreement recieved','learner agreement received'],
+  mieChecksCompleted:['mie checks completed']
+};
+const SELECT_FIELD_OPTIONS = {
+  provider:['Apex Academy','Catalyst','Pulse Afrika'],
+  employment:['Employed','Unemployed'],
+  deliveryMode:['Online','Physical','Blended'],
+  customization:['Yes','No'],
+  recruitment:['Yes','No','N/A'],
+  qualificationType:['Learnership','Skills Programme','Internship','Bursary','Other'],
+  funding:['Funded','Unfunded'],
+  examMode:['Online','Physical','Blended','N/A'],
+  facilitatorTravel:['Yes','No'],
+  hardcopyMaterial:['Yes','No'],
+  workOnClientPremises:['Yes','No'],
+  idsReceived:['Yes','No'],
+  qualificationsReceived:['Yes','No'],
+  cvsReceived:['Yes','No'],
+  disabilityLettersReceived:['Yes','No'],
+  approvedScheduleReceived:['Yes','No'],
+  learnerListReceived:['Yes','No'],
+  learnerAgreementReceived:['Yes','No'],
+  mieChecksCompleted:['Yes','No']
+};
+const MONTH_ABBR = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const MONTH_FULL = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+function findCol(headers, aliases){
+  const clean = s=>(s||'').toString().toLowerCase().trim().replace(/[.,]/g,'');
+  const lh = headers.map(clean);
+  for(const a of aliases){
+    const al = clean(a);
+    const i = lh.findIndex(h=>h===al);
+    if(i>-1) return i;
+  }
+  for(const a of aliases){
+    const al = clean(a);
+    const i = lh.findIndex(h=>h.includes(al));
+    if(i>-1) return i;
+  }
+  return -1;
+}
+
+function parseImportDate(v){
+  if(v==null) return '';
+  const s = v.toString().trim();
+  if(!s) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  let m = s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,})[-\/ ](\d{2,4})$/);
+  if(m){
+    const day = m[1].padStart(2,'0');
+    const monIdx = MONTH_ABBR.indexOf(m[2].slice(0,3).toLowerCase());
+    if(monIdx>-1){
+      let year = m[3];
+      if(year.length===2) year = (parseInt(year,10)<70?'20':'19')+year;
+      return `${year}-${String(monIdx+1).padStart(2,'0')}-${day}`;
+    }
+  }
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if(m){
+    const monIdx = MONTH_FULL.indexOf(m[2].toLowerCase());
+    if(monIdx>-1) return `${m[3]}-${String(monIdx+1).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  return s;
+}
+
+function normalizeSelectFields(data){
+  Object.keys(SELECT_FIELD_OPTIONS).forEach(key=>{
+    if(data[key]){
+      const found = SELECT_FIELD_OPTIONS[key].find(o=>o.toLowerCase()===data[key].toLowerCase());
+      if(found) data[key] = found;
+    }
+  });
+}
+
+function importProgrammesWorkbook(wb){
+  let imported = 0;
+  wb.SheetNames.forEach(name=>{
+    const ws = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    if(rows.length<2) return;
+    const headers = rows[0];
+    const colIdx = {};
+    Object.keys(IMPORT_FIELD_ALIASES).forEach(key=>{ colIdx[key] = findCol(headers, IMPORT_FIELD_ALIASES[key]); });
+    if(colIdx.clientName===-1 && colIdx.programmeName===-1) return;
+    for(let r=1; r<rows.length; r++){
+      const row = rows[r];
+      if(row.every(c=>normCell(c)==='')) continue;
+      const data = {};
+      Object.keys(colIdx).forEach(key=>{
+        const idx = colIdx[key];
+        if(idx===-1) return;
+        let val = normCell(row[idx]);
+        if((key==='inductionDate'||key==='trainingStartDate') && val) val = parseImportDate(val);
+        if(val) data[key] = val;
+      });
+      normalizeSelectFields(data);
+      if(!data.clientName && !data.programmeName) continue;
+      const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+      programmes.unshift({ id, data, notes:{},
+        rollout:{ qualificationTitle:'', inductionDate:'', inductionTime:'', modules:[], columns:cloneDefaultCols(), fisaDate:'', submissionDate:'', resultsDate:'', sourceMeta:null },
+        createdAt:Date.now(), updatedAt:Date.now() });
+      imported++;
+    }
+  });
+  return imported;
+}
+
+function looksLikeRolloutFile(wb){
+  for(const name of wb.SheetNames){
+    const ws = wb.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    for(const row of rows){
+      for(const cell of row){
+        const v = normCell(cell).toLowerCase();
+        if(v==='subject code' || /^module\s+\d+/i.test(v)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+document.getElementById('programmeFileInput').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const count = importProgrammesWorkbook(wb);
+      if(count===0){
+        if(looksLikeRolloutFile(wb)){
+          showToast('That looks like a Rollout Schedule file — use "Import from Excel" inside Rollout Document instead');
+        } else {
+          showToast('No matching rows found — check column headers');
+        }
+      } else {
+        saveData();
+        renderDashboard();
+        showToast(`Imported ${count} programme${count===1?'':'s'}`);
+      }
+    }catch(err){
+      showToast('Import failed — check file format');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function exportAllCSV(){
+  const cols = stages.filter(s=>!s.rollout).flatMap(s=>s.fields.map(f=>f.id));
+  const header = [...cols,'rolloutModules'].join(',');
+  const rows = programmes.map(p=>[...cols.map(c=>`"${(p.data[c]||'').toString().replace(/"/g,'""')}"`), (p.rollout?p.rollout.modules.length:0)].join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'programmes.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV downloaded');
+}
+
+function copySummary(rec){
+  const d = rec.data;
+  const lines = stages.filter(s=>!s.rollout).flatMap(s=>s.fields.filter(f=>visibleField(f,d)).map(f=>`${f.label}: ${d[f.id]||'—'}`));
+  if(rec.rollout && rec.rollout.modules.length){
+    lines.push('', 'ROLLOUT SCHEDULE', `Qualification: ${rec.rollout.qualificationTitle||'—'}`, `Induction: ${rec.rollout.inductionDate||'—'} ${rec.rollout.inductionTime||''}`);
+    rec.rollout.modules.forEach((m,i)=>{
+      lines.push('', `${m.title||'Module '+(i+1)} (Credits: ${moduleCredits(m)})`);
+      m.subjects.forEach(s=>lines.push(`  ${s.subjectCode||''} ${s.module||''} — Facilitation: ${s.facilitation||'—'}`));
+    });
+  }
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(()=>showToast('Summary copied')).catch(()=>showToast('Copy failed'));
+}
+
+function moduleCredits(m){
+  return m.subjects.reduce((sum,s)=>sum + (parseFloat(s.credits)||0), 0);
+}
+
+function moduleNumber(m, idx){
+  const m1 = (m.title||'').match(/MODULE\s+(\d+)/i);
+  return m1 ? m1[1] : (idx+1);
+}
+
+function splitCols(columns){
+  const perSubjectCols = columns.filter(c=>SUBJECT_LEVEL_COL_IDS.includes(c.id));
+  const moduleCols = columns.filter(c=>!SUBJECT_LEVEL_COL_IDS.includes(c.id));
+  return {perSubjectCols, moduleCols};
+}
+
+function computeColWidths(perSubjectCols, moduleCols){
+  // give the fixed metadata columns sensible fixed widths, split the rest evenly
+  const fixedWidth = {subjectCode:6, module:20, type:6, level:5, credits:5};
+  const perSubjectWidths = perSubjectCols.map(c=>fixedWidth[c.id] ?? 8);
+  const usedByFixed = perSubjectWidths.reduce((a,b)=>a+b,0);
+  const remaining = Math.max(100 - usedByFixed, moduleCols.length*6);
+  const moduleWidth = moduleCols.length ? remaining / moduleCols.length : 0;
+  return [...perSubjectWidths, ...moduleCols.map(()=>moduleWidth)];
+}
+
+function moduleValueFor(m, colId){
+  const s = m.subjects.find(s=>s[colId]) || m.subjects[0] || {};
+  return s[colId] || '';
+}
+
+function buildRolloutDocument(rec){
+  ensureRollout(rec);
+  const d = rec.data;
+  const ro = rec.rollout;
+  const columns = ro.columns && ro.columns.length ? ro.columns : cloneDefaultCols();
+  const {perSubjectCols, moduleCols} = splitCols(columns);
+  const colWidths = computeColWidths(perSubjectCols, moduleCols);
+  const colgroup = `<colgroup>${colWidths.map(w=>`<col style="width:${w}%">`).join('')}</colgroup>`;
+
+  const modulesHtml = ro.modules.map((m,mi)=>{
+    const subjects = m.subjects.length ? m.subjects : [{}];
+    const bodyRows = subjects.map((s,si)=>{
+      let tds = perSubjectCols.map(c=>`<td class="${c.id==='module'?'pd-left':''}">${esc(s[c.id])||'&nbsp;'}</td>`).join('');
+      if(si===0){
+        tds += moduleCols.map(c=>`<td class="pd-date${/logbook/i.test(c.label)?' pd-logbook':''}" rowspan="${subjects.length}">${esc(moduleValueFor(m,c.id))||'&nbsp;'}</td>`).join('');
+      }
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    const phaseBand = m.phaseLabel ? `<div class="pd-phase-band">${esc(m.phaseLabel)}</div>` : '';
+    const modBand = m.moderationBefore ? `<div class="pd-moderation-band">${esc(m.moderationBefore)}</div>` : '';
+    const tagsHtml = (m.tags && m.tags.length) ? m.tags.map(t=>`<span class="pd-tag">${esc(t)}</span>`).join('') : '';
+    const panelHtml = m.panel ? (()=>{
+      const maxDates = Math.max(1, ...m.panel.items.map(it=>it.dates.length));
+      const introHtml = m.panel.intro ? `<div class="pd-panel-intro">${esc(m.panel.intro)}</div>` : '';
+      const headerRow = `<tr><th>${esc(m.panel.leftTitle||'Activity')}</th><th colspan="${maxDates}">${esc(m.panel.rightTitle||'Date(s)')}</th></tr>`;
+      const bodyRows = m.panel.items.map(it=>{
+        const dateCells = Array.from({length:maxDates}).map((_,idx)=>`<td>${esc(it.dates[idx])||'&nbsp;'}</td>`).join('');
+        return `<tr><td class="pd-panel-label">${esc(it.label)}</td>${dateCells}</tr>`;
+      }).join('');
+      return `${introHtml}<table class="pd-panel-table"><thead>${headerRow}</thead><tbody>${bodyRows}</tbody></table>`;
+    })() : '';
+    return `
+      ${phaseBand}${modBand}
+      <div class="pd-module-row">
+        <div class="pd-module-main">
+          <div class="pd-module-band">${esc(m.title)}${tagsHtml}</div>
+          <table class="pd-table">
+            ${colgroup}
+            <thead><tr>${[...perSubjectCols,...moduleCols].map(c=>`<th title="${esc(c.label)}">${esc(c.label)}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${bodyRows}
+              <tr class="pd-credit"><td colspan="${Math.max(perSubjectCols.length-1,1)}">CREDIT VALUE</td><td>${moduleCredits(m)}</td><td colspan="${moduleCols.length}"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        ${panelHtml ? `<div class="pd-module-side">${panelHtml}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const closeOutHtml = (ro.closeOut && ro.closeOut.rows.length) ? `
+    <div class="pd-module-band">${esc(ro.closeOut.title)}</div>
+    <table class="pd-panel-table">
+      <tbody>
+        ${ro.closeOut.rows.map(r=>`<tr><td class="pd-panel-label">${esc(r.label)}</td><td>${esc(r.value)||'&nbsp;'}</td></tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
+  const re5Html = (ro.re5 && ro.re5.rows.length) ? `
+    <div class="pd-module-band">${esc(ro.re5.title)}</div>
+    <table class="pd-table">
+      <thead><tr>${ro.re5.columns.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${ro.re5.rows.map(r=>`<tr>${ro.re5.columns.map(c=>`<td class="${c.id==='subjectCode'?'pd-left':''}">${esc(r[c.id])||'&nbsp;'}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+    ${ro.re5.milestones.length ? `<table class="pd-panel-table"><tbody>${ro.re5.milestones.map(ms=>`<tr><td class="pd-panel-label">${esc(ms.label)}</td><td>${esc(ms.value)||'&nbsp;'}</td></tr>`).join('')}</tbody></table>` : ''}` : '';
+
+  const theme = getProviderTheme(d.provider);
+  const docBody = `
+    <div class="pd-page">
+      <div class="pd-letterhead">
+        <img src="${theme.logo}" alt="${esc(d.provider||'Apex Academy')}">
+        <div class="doctag">Programme Rollout Schedule</div>
+      </div>
+      <div class="pd-titleband">
+        <div class="l1">${esc(ro.qualificationTitle || d.programmeName || 'Programme Rollout Schedule')}</div>
+        <div class="l2">${esc(d.clientName||'')}</div>
+        <div class="l3">Induction: ${esc(ro.inductionDate||'')}${ro.inductionTime?', '+esc(ro.inductionTime):''}</div>
+      </div>
+      ${modulesHtml || '<p style="font-size:9pt;color:#666;margin-top:10px">No modules added yet.</p>'}
+      ${closeOutHtml}
+      ${re5Html}
+      <table class="pd-fisa-table">
+        <tr><td>FISA</td><td class="pd-fisa-date">${esc(ro.fisaDate)||'&nbsp;'}</td></tr>
+        <tr><td>Submission</td><td class="pd-fisa-date">${esc(ro.submissionDate)||'&nbsp;'}</td></tr>
+        <tr><td>Results</td><td class="pd-fisa-date">${esc(ro.resultsDate)||'&nbsp;'}</td></tr>
+      </table>
+    </div>
+  `;
+
+  const standaloneHtml = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(ro.qualificationTitle || d.programmeName || 'Rollout Schedule')}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',Arial,sans-serif;background:#EDF1F7;padding:20px}
+.pd-page{max-width:1400px;margin:0 auto;background:#fff;box-shadow:0 2px 16px rgba(16,34,59,.12);border-radius:10px;overflow:hidden}
+.pd-page>*:not(.pd-letterhead):not(.pd-titleband){margin-left:16px;margin-right:16px}
+.pd-page>.pd-fisa-table{margin-bottom:16px}
+.pd-print-hint{max-width:1400px;margin:0 auto 12px;background:#FFF8E1;border:1px solid #F0C040;border-radius:6px;padding:10px 14px;font-family:Arial,sans-serif;font-size:9.5pt;color:#5A4300;text-align:center}
+${buildPdStyles(theme)}
+@media print{
+  body{background:#fff;padding:0}
+  .pd-print-hint{display:none}
+  .pd-page{box-shadow:none;max-width:none}
+  @page{size:A4 landscape;margin:10mm}
+}
+</style></head>
+<body>
+<div class="pd-print-hint">When printing or saving as PDF, select <strong>Landscape</strong> orientation for the best fit.</div>
+${docBody}</body></html>`;
+
+  const fname = (d.programmeName || ro.qualificationTitle || 'Untitled_Programme').toString().replace(/[^a-z0-9]+/gi,'_').slice(0,60) + '_Rollout_Schedule.html';
+  return { html: standaloneHtml, fname };
+}
+
+let pendingRolloutDoc = null;
+
+function downloadRolloutSchedule(rec){
+  pendingRolloutDoc = buildRolloutDocument(rec);
+  document.getElementById('rolloutPreviewFrame').srcdoc = pendingRolloutDoc.html;
+  document.getElementById('previewModalOverlay').classList.add('open');
+}
+
+function confirmRolloutDownload(){
+  if(!pendingRolloutDoc) return;
+  const blob = new Blob([pendingRolloutDoc.html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = pendingRolloutDoc.fname; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded — open the file and print or "Save as PDF"');
+}
+
+/* ---------- NATIVE STYLED EXCEL EXPORT ----------
+   Produces a real, editable .xlsx that mirrors the same module-band / header /
+   topic-row / merged-date / credit-value layout as the branded HTML document
+   (see buildRolloutDocument), but as native Excel cells, fills, and merges —
+   built with ExcelJS so the PI can open it and edit directly, rather than a
+   flattened printout. Reuses splitCols/moduleValueFor/moduleCredits so the two
+   exports can never visually drift apart. */
+async function buildStyledRolloutXlsx(rec){
+  ensureRollout(rec);
+  const d = rec.data, ro = rec.rollout;
+  const theme = getProviderTheme(d.provider);
+  const columns = ro.columns && ro.columns.length ? ro.columns : cloneDefaultCols();
+  const {perSubjectCols, moduleCols} = splitCols(columns);
+  const allCols = [...perSubjectCols, ...moduleCols];
+  const nCols = allCols.length || 1;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Apex PI Specialist';
+  const ws = wb.addWorksheet('Rollout Schedule', {views:[{showGridLines:false}]});
+
+  const fixedWidth = {subjectCode:14, module:48, type:10, level:8, credits:9};
+
+  const hexToArgb = hex => 'FF'+hex.replace('#','').toUpperCase();
+  const NAVY = hexToArgb(theme.navy), NAVY_DARK = hexToArgb(theme.navyDark);
+  const GOLD_LIGHT = hexToArgb(theme.goldLight);
+  const HEADER_BG='FFEDF1F7', DATE_BG='FFFBF3DF', DATE_TEXT='FF7A5B0A',
+        BODY_TEXT='FF4A5568', BORDER='FFDEE5EF', CREDIT_BG='FFF8FAFC', WHITE='FFFFFFFF';
+  const thin = {style:'thin', color:{argb:BORDER}};
+  const allBorders = {top:thin, left:thin, bottom:thin, right:thin};
+  const fill = argb => ({type:'pattern', pattern:'solid', fgColor:{argb}});
+
+  let r = 1;
+  function bannerRow(text, bg, fontOverrides, height){
+    ws.mergeCells(r,1,r,nCols);
+    const cell = ws.getCell(r,1);
+    cell.value = text;
+    cell.font = Object.assign({bold:true, size:12, color:{argb:WHITE}, name:'Calibri'}, fontOverrides||{});
+    cell.fill = fill(bg);
+    cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+    ws.getRow(r).height = height||22;
+    r++;
+  }
+  bannerRow(ro.qualificationTitle || d.programmeName || 'Programme Rollout Schedule', NAVY, {size:14}, 26);
+  bannerRow(d.clientName || '', NAVY, {size:11, color:{argb:'FFC9D6E8'}}, 20);
+  bannerRow(`Induction: ${ro.inductionDate||''}${ro.inductionTime?', '+ro.inductionTime:''}`, NAVY_DARK, {size:10.5, color:{argb:GOLD_LIGHT}}, 20);
+  r++;
+
+  const panelMaxDates = ro.modules.reduce((mx,m)=> m.panel ? Math.max(mx, ...m.panel.items.map(it=>it.dates.length), 1) : mx, 0);
+  const hasAnyPanel = panelMaxDates > 0;
+  const panelStartCol = nCols + 2; // one blank spacer column, then the panel's own label column
+  const panelDateStartCol = panelStartCol + 1;
+
+  ws.columns = [
+    ...allCols.map(c=>({width: fixedWidth[c.id] || (SUBJECT_LEVEL_COL_IDS.includes(c.id)?12:20)})),
+    ...(hasAnyPanel ? [{width:3}, {width:26}, ...Array(panelMaxDates).fill(0).map(()=>({width:13}))] : [])
+  ];
+
+  const LOGBOOK_BG = 'FFFFF6A8', LOGBOOK_TEXT = 'FF7A5B00';
+  ro.modules.forEach(m=>{
+    if(m.phaseLabel){
+      ws.mergeCells(r,1,r,nCols);
+      const pc = ws.getCell(r,1);
+      pc.value = m.phaseLabel;
+      pc.font = {bold:true, size:11, color:{argb:WHITE}, name:'Calibri'};
+      pc.fill = fill('FFC0202D');
+      pc.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      ws.getRow(r).height = 20;
+      r++;
+    }
+    if(m.moderationBefore){
+      ws.mergeCells(r,1,r,nCols);
+      const mc = ws.getCell(r,1);
+      mc.value = m.moderationBefore;
+      mc.font = {bold:true, size:9.5, color:{argb:WHITE}, name:'Calibri'};
+      mc.fill = fill('FF6B2D8C');
+      mc.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      ws.getRow(r).height = 16;
+      r++;
+    }
+    const panelAnchorRow = r;
+    ws.mergeCells(r,1,r,nCols);
+    const band = ws.getCell(r,1);
+    band.value = m.tags && m.tags.length ? `${m.title}   [${m.tags.join(' / ')}]` : m.title;
+    band.font = {bold:true, size:11, color:{argb:WHITE}, name:'Calibri'};
+    band.fill = fill('FF2D4A7A');
+    band.alignment = {horizontal:'left', vertical:'middle', indent:1};
+    ws.getRow(r).height = 20;
+    r++;
+
+    allCols.forEach((c,ci)=>{
+      const cell = ws.getCell(r, ci+1);
+      cell.value = c.label;
+      cell.font = {bold:true, size:9, color:{argb:NAVY}, name:'Calibri'};
+      cell.fill = fill(HEADER_BG);
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      cell.border = allBorders;
+    });
+    ws.getRow(r).height = 26;
+    r++;
+
+    const subjects = m.subjects.length ? m.subjects : [{}];
+    const firstDataRow = r;
+    subjects.forEach(s=>{
+      perSubjectCols.forEach((c,ci)=>{
+        const cell = ws.getCell(r, ci+1);
+        cell.value = s[c.id] || '';
+        cell.font = {size:9, color:{argb:BODY_TEXT}, name:'Calibri'};
+        cell.alignment = {horizontal: c.id==='module'?'left':'center', vertical:'middle', wrapText:true};
+        cell.border = allBorders;
+      });
+      r++;
+    });
+    const lastDataRow = r-1;
+
+    moduleCols.forEach((c,ci)=>{
+      const colIdx = perSubjectCols.length+ci+1;
+      if(lastDataRow>firstDataRow) ws.mergeCells(firstDataRow,colIdx,lastDataRow,colIdx);
+      const cell = ws.getCell(firstDataRow,colIdx);
+      const isLogbook = /logbook/i.test(c.label);
+      cell.value = moduleValueFor(m, c.id) || '';
+      cell.font = {bold:true, size:9, color:{argb: isLogbook?LOGBOOK_TEXT:DATE_TEXT}, name:'Calibri'};
+      cell.fill = fill(isLogbook?LOGBOOK_BG:DATE_BG);
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      for(let rr=firstDataRow; rr<=lastDataRow; rr++){
+        const cc = ws.getCell(rr,colIdx);
+        cc.border = allBorders;
+        if(isLogbook) cc.fill = fill(LOGBOOK_BG);
+      }
+    });
+
+    const labelSpan = Math.max(perSubjectCols.length-1,1);
+    ws.mergeCells(r,1,r,labelSpan);
+    const creditLabel = ws.getCell(r,1);
+    creditLabel.value = 'CREDIT VALUE';
+    creditLabel.alignment = {horizontal:'center', vertical:'middle'};
+    const creditVal = ws.getCell(r, labelSpan+1);
+    creditVal.value = moduleCredits(m);
+    creditVal.alignment = {horizontal:'center', vertical:'middle'};
+    for(let cc=1; cc<=nCols; cc++){
+      const cell = ws.getCell(r,cc);
+      cell.font = {bold:true, size:9, color:{argb:NAVY}, name:'Calibri'};
+      cell.fill = fill(CREDIT_BG);
+      cell.border = allBorders;
+    }
+    ws.getRow(r).height = 20;
+    r++;
+
+    if(m.panel){
+      let pr = panelAnchorRow;
+      if(m.panel.intro){
+        const introCell = ws.getCell(pr,panelStartCol);
+        introCell.value = m.panel.intro;
+        introCell.font = {italic:true, size:8, color:{argb:'FF7A8699'}, name:'Calibri'};
+        introCell.alignment = {wrapText:true, vertical:'middle'};
+        ws.mergeCells(pr,panelStartCol,pr,panelDateStartCol+panelMaxDates-1);
+        ws.getRow(pr).height = Math.max(ws.getRow(pr).height||20, 20);
+        pr++;
+      }
+      const maxDates = Math.max(1, m.panel.items.reduce((mx,it)=>Math.max(mx,it.dates.length),0));
+      const headLabel = ws.getCell(pr,panelStartCol);
+      headLabel.value = m.panel.leftTitle || 'Activity';
+      headLabel.font = {bold:true, size:8.5, color:{argb:WHITE}, name:'Calibri'};
+      headLabel.fill = fill(NAVY);
+      headLabel.border = allBorders;
+      headLabel.alignment = {vertical:'middle', wrapText:true};
+      const dateHeadEnd = panelDateStartCol+maxDates-1;
+      if(dateHeadEnd>panelDateStartCol) ws.mergeCells(pr,panelDateStartCol,pr,dateHeadEnd);
+      const headDate = ws.getCell(pr,panelDateStartCol);
+      headDate.value = m.panel.rightTitle || 'Date(s)';
+      headDate.font = {bold:true, size:8.5, color:{argb:WHITE}, name:'Calibri'};
+      headDate.fill = fill(NAVY);
+      headDate.alignment = {horizontal:'center', vertical:'middle'};
+      for(let cc=panelDateStartCol; cc<=dateHeadEnd; cc++) ws.getCell(pr,cc).border = allBorders;
+      pr++;
+      m.panel.items.forEach(it=>{
+        const labelCell = ws.getCell(pr,panelStartCol);
+        labelCell.value = it.label;
+        labelCell.font = {bold:true, size:8.5, color:{argb:NAVY}, name:'Calibri'};
+        labelCell.fill = fill('FFF8FAFC');
+        labelCell.border = allBorders;
+        labelCell.alignment = {vertical:'middle', wrapText:true};
+        for(let dIdx=0; dIdx<maxDates; dIdx++){
+          const cc = panelDateStartCol+dIdx;
+          const cell = ws.getCell(pr,cc);
+          cell.value = it.dates[dIdx] || '';
+          cell.font = {size:8.5, color:{argb:BODY_TEXT}, name:'Calibri'};
+          cell.alignment = {horizontal:'center', vertical:'middle'};
+          cell.border = allBorders;
+        }
+        pr++;
+      });
+      r = Math.max(r, pr);
+    }
+    r += 1; // spacer between modules
+  });
+
+  // "PoE Building / Close-Out" and "RE5 Workshop Preparation" — short label/value mini-tables,
+  // rendered the same way as the side-panel notes above.
+  function labelValueTable(title, rows){
+    if(!rows.length) return;
+    ws.mergeCells(r,1,r,nCols);
+    const band = ws.getCell(r,1);
+    band.value = title;
+    band.font = {bold:true, size:11, color:{argb:WHITE}, name:'Calibri'};
+    band.fill = fill('FF2D4A7A');
+    band.alignment = {horizontal:'left', vertical:'middle', indent:1};
+    ws.getRow(r).height = 20;
+    r++;
+    rows.forEach(row=>{
+      const labelCell = ws.getCell(r,1);
+      labelCell.value = row.label;
+      labelCell.font = {bold:true, size:8.5, color:{argb:NAVY}, name:'Calibri'};
+      labelCell.fill = fill('FFF8FAFC');
+      labelCell.border = allBorders;
+      const endCol = Math.max(2,nCols);
+      if(endCol>2) ws.mergeCells(r,2,r,endCol);
+      const valCell = ws.getCell(r,2);
+      valCell.value = row.value;
+      valCell.font = {size:8.5, color:{argb:BODY_TEXT}, name:'Calibri'};
+      for(let cc=2; cc<=endCol; cc++) ws.getCell(r,cc).border = allBorders;
+      r++;
+    });
+    r++;
+  }
+  if(ro.closeOut) labelValueTable(ro.closeOut.title, ro.closeOut.rows);
+  if(ro.re5){
+    if(ro.re5.rows.length){
+      ws.mergeCells(r,1,r,nCols);
+      const band = ws.getCell(r,1);
+      band.value = ro.re5.title;
+      band.font = {bold:true, size:11, color:{argb:WHITE}, name:'Calibri'};
+      band.fill = fill('FF2D4A7A');
+      band.alignment = {horizontal:'left', vertical:'middle', indent:1};
+      ws.getRow(r).height = 20;
+      r++;
+      ro.re5.columns.forEach((c,ci)=>{
+        const cell = ws.getCell(r, ci+1);
+        cell.value = c.label;
+        cell.font = {bold:true, size:9, color:{argb:NAVY}, name:'Calibri'};
+        cell.fill = fill(HEADER_BG);
+        cell.border = allBorders;
+      });
+      r++;
+      ro.re5.rows.forEach(row=>{
+        ro.re5.columns.forEach((c,ci)=>{
+          const cell = ws.getCell(r, ci+1);
+          cell.value = row[c.id] || '';
+          cell.font = {size:9, color:{argb:BODY_TEXT}, name:'Calibri'};
+          cell.border = allBorders;
+          cell.alignment = {wrapText:true};
+        });
+        r++;
+      });
+      r++;
+    }
+    labelValueTable(ro.re5.title + ' — Moderation & Close-Out', ro.re5.milestones);
+  }
+
+  [['FISA', ro.fisaDate], ['Submission', ro.submissionDate], ['Results', ro.resultsDate]].forEach(([label,val])=>{
+    const labelCell = ws.getCell(r,1);
+    labelCell.value = label;
+    labelCell.font = {bold:true, size:9.5, color:{argb:WHITE}, name:'Calibri'};
+    labelCell.fill = fill(NAVY);
+    labelCell.alignment = {horizontal:'center', vertical:'middle'};
+    labelCell.border = allBorders;
+    const endCol = Math.min(4,nCols);
+    if(endCol>=2) ws.mergeCells(r,2,r,endCol);
+    for(let cc=2; cc<=Math.max(endCol,2); cc++){
+      const cell = ws.getCell(r,cc);
+      if(cc===2) cell.value = val || '';
+      cell.font = {bold:true, size:9.5, color:{argb:DATE_TEXT}, name:'Calibri'};
+      cell.fill = fill(DATE_BG);
+      cell.alignment = {horizontal:'center', vertical:'middle'};
+      cell.border = allBorders;
+    }
+    ws.getRow(r).height = 20;
+    r++;
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const fname = (d.programmeName || ro.qualificationTitle || 'Untitled_Programme').toString().replace(/[^a-z0-9]+/gi,'_').slice(0,60) + '_Rollout_Schedule.xlsx';
+  return {buf, fname};
+}
+
+async function downloadStyledRolloutXlsx(rec){
+  try{
+    const {buf, fname} = await buildStyledRolloutXlsx(rec);
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Downloaded — a native, editable Excel version of the schedule');
+  }catch(err){
+    console.error(err);
+    showToast('Could not generate the styled Excel export — see console for details');
+  }
+}
+
+async function exportRolloutOriginalXLSX(rec){
+  const ro = rec.rollout;
+  if(!ro.sourceMeta){
+    showToast('This rollout wasn\'t imported from Excel, so there\'s no original file to write back into — use "Preview & Download" for a generated document instead.');
+    return;
+  }
+  let src;
+  try{
+    const r = await window.storage.get(rolloutSourceKey(rec.id), false);
+    src = r ? JSON.parse(r.value) : null;
+  }catch(err){ src = null; }
+  if(!src || !src.fileB64){
+    showToast('The original source file for this rollout is no longer available — re-import to enable this export.');
+    return;
+  }
+  try{
+    const wb = XLSX.read(new Uint8Array(base64ToArrayBuffer(src.fileB64)), {type:'array', cellDates:true});
+    const ws = wb.Sheets[src.sheetName];
+    if(!ws){ showToast('The original sheet ("'+src.sheetName+'") was not found in the source file'); return; }
+    let writes = 0, unmapped = 0;
+    ro.modules.forEach(m=>{
+      m.subjects.forEach(s=>{
+        if(s._ri==null){ unmapped++; return; }
+        ro.columns.forEach(c=>{
+          const ci = (s._ci && s._ci[c.id]!=null) ? s._ci[c.id] : c.ci;
+          if(ci==null) return;
+          const val = s[c.id];
+          if(val===undefined || val==='') return;
+          // Only touch cells that actually changed since import — this keeps every untouched
+          // cell's original Excel type (dates, numbers, etc.) instead of flattening the whole
+          // row to text just because one cell in it was edited.
+          const orig = s._orig ? s._orig[c.id] : undefined;
+          if(orig!==undefined && orig===val) return;
+          const addr = XLSX.utils.encode_cell({r:s._ri, c:ci});
+          const existing = ws[addr];
+          const cell = existing ? Object.assign({}, existing) : {t:'s'};
+          cell.t = 's';
+          cell.v = val;
+          delete cell.w; // drop cached display text so Excel/SheetJS re-renders it from the new value
+          ws[addr] = cell;
+          writes++;
+        });
+      });
+    });
+    const outName = (src.fileName||'rollout.xlsx').replace(/\.xlsx?$/i,'') + '_updated.xlsx';
+    XLSX.writeFile(wb, outName);
+    let msg = `Downloaded ${outName} — ${writes} cell${writes===1?'':'s'} written back into the original file`;
+    if(unmapped) msg += ` (${unmapped} manually-added row${unmapped===1?'':'s'} weren't in the source layout, so they're not included in this export)`;
+    showToast(msg);
+  }catch(err){
+    console.error(err);
+    showToast('Write-back export failed — see console for details');
+  }
+}
+
+document.getElementById('previewDownloadBtn').addEventListener('click', confirmRolloutDownload);
+document.getElementById('previewModalClose').addEventListener('click', ()=>{
+  document.getElementById('previewModalOverlay').classList.remove('open');
+});
+document.getElementById('previewModalOverlay').addEventListener('click', e=>{
+  if(e.target.id==='previewModalOverlay') document.getElementById('previewModalOverlay').classList.remove('open');
+});
+
+/* ---------- HAND OVER TO PM ---------- */
+let handoverRec = null;
+function openHandoverModal(rec){
+  handoverRec = rec;
+  document.getElementById('handoverPmEmail').value = '';
+  document.getElementById('handoverError').style.display = 'none';
+  document.getElementById('handoverConfirmBtn').disabled = false;
+  document.getElementById('handoverConfirmBtn').textContent = 'Confirm Hand Over';
+  document.getElementById('handoverModalOverlay').classList.add('open');
+}
+function closeHandoverModal(){
+  document.getElementById('handoverModalOverlay').classList.remove('open');
+}
+document.getElementById('handoverModalClose').addEventListener('click', closeHandoverModal);
+document.getElementById('handoverCancelBtn').addEventListener('click', closeHandoverModal);
+document.getElementById('handoverModalOverlay').addEventListener('click', e=>{
+  if(e.target.id==='handoverModalOverlay') closeHandoverModal();
+});
+document.getElementById('handoverConfirmBtn').addEventListener('click', async ()=>{
+  const errEl = document.getElementById('handoverError');
+  errEl.style.display = 'none';
+  const pmEmail = document.getElementById('handoverPmEmail').value.trim();
+  if(!pmEmail || !pmEmail.includes('@')){
+    errEl.textContent = 'Enter a valid PM email.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const d = handoverRec.data;
+  const roster = (d.learnerRoster || '').split('\n').map(s=>s.trim()).filter(Boolean);
+  const btn = document.getElementById('handoverConfirmBtn');
+  btn.disabled = true; btn.textContent = 'Handing over…';
+  try{
+    const { data, error } = await supabaseClient.rpc('submit_and_handover_programme', {
+      p_data: d,
+      p_roster: roster,
+      p_pm_email: pmEmail
+    });
+    if(error) throw error;
+    closeHandoverModal();
+    showToast(`Handed over to ${pmEmail} — programme #${data.id} is now live in the Programme Ledger.`);
+  }catch(e){
+    errEl.textContent = e.message || 'Hand over failed.';
+    errEl.style.display = 'block';
+  }finally{
+    btn.disabled = false; btn.textContent = 'Confirm Hand Over';
+  }
+});
+
+const PROVIDER_THEMES = {
+  'Apex Academy': { logo: APEXU_LOGO_B64, navyDark:'#10223B', navy:'#1A365D', gold:'#D4A017', goldLight:'#F0C040' },
+  'Catalyst':     { logo: APEXU_LOGO_B64, navyDark:'#10223B', navy:'#1A365D', gold:'#D4A017', goldLight:'#F0C040' },
+  'Pulse Afrika': { logo: APEXU_LOGO_B64, navyDark:'#10223B', navy:'#1A365D', gold:'#D4A017', goldLight:'#F0C040' }
+};
+function getProviderTheme(providerName){
+  return PROVIDER_THEMES[providerName] || PROVIDER_THEMES['Apex Academy'];
+}
+
+function buildPdStyles(theme){
+  return `
+.pd-page{font-family:'DM Sans','Poppins',Arial,sans-serif;color:#1E2533}
+.pd-letterhead{background:linear-gradient(135deg,${theme.navyDark} 0%,${theme.navy} 100%);border-bottom:4px solid ${theme.gold};padding:16px 22px;display:flex;align-items:center;justify-content:space-between}
+.pd-letterhead img{height:38px;width:auto;display:block;object-fit:contain;background:#fff;padding:4px 8px;border-radius:6px}
+.pd-letterhead .doctag{color:${theme.goldLight};font-weight:800;letter-spacing:.16em;text-transform:uppercase;font-size:8.5pt;font-family:Arial,sans-serif}
+.pd-titleband{background:${theme.navy};padding:14px 16px;text-align:center;border-radius:0 0 8px 8px}
+.pd-titleband .l1{color:#fff;font-weight:800;font-size:15pt;line-height:1.3;letter-spacing:.01em}
+.pd-titleband .l2{color:#C9D6E8;font-weight:600;font-size:11pt;margin-top:3px}
+.pd-titleband .l3{color:${theme.goldLight};font-weight:700;font-size:9.5pt;margin-top:6px;letter-spacing:.02em}
+.pd-module-row{display:flex;align-items:flex-start;gap:10px;margin-top:16px}
+.pd-module-main{flex:1 1 62%;min-width:0}
+.pd-module-main .pd-module-band{margin-top:0}
+.pd-module-side{flex:1 1 38%;min-width:0;margin-top:34px}
+.pd-module-band{background:#2D4A7A;color:#fff;font-weight:700;font-size:10.5pt;text-align:left;padding:7px 12px;border-radius:6px 6px 0 0;margin-top:16px;font-family:'DM Sans',Arial,sans-serif;letter-spacing:.01em}
+.pd-phase-band{background:#C0202D;color:#fff;font-weight:800;font-size:10pt;text-align:center;padding:8px 12px;border-radius:6px;margin-top:18px;letter-spacing:.02em}
+.pd-moderation-band{background:#6B2D8C;color:#fff;font-weight:800;font-size:9pt;text-align:center;padding:5px 12px;border-radius:4px;margin-top:12px;letter-spacing:.03em}
+table.pd-table td.pd-logbook{background:#FFF6A8;color:#7A5B00;font-weight:700}
+.pd-tag{display:inline-block;background:rgba(255,255,255,.18);color:#fff;font-size:6.5pt;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:10px;margin-left:8px;vertical-align:middle}
+table.pd-panel-table{border-collapse:collapse;width:100%;font-size:8pt;font-family:'DM Sans',Calibri,Arial,sans-serif;margin-top:0 0 4px 0;background:#F8FAFC}
+table.pd-panel-table td{padding:5px 8px;border:1px solid #DEE5EF;color:#4A5568}
+table.pd-panel-table td.pd-panel-label{font-weight:600;color:${theme.navy};width:38%}
+table.pd-panel-table th{padding:5px 8px;border:1px solid #DEE5EF;background:${theme.navy};color:#fff;font-size:7.5pt;font-weight:700;text-align:center}
+.pd-panel-intro{font-size:7.5pt;color:#7A8699;font-style:italic;margin:6px 0 4px;padding:0 2px}
+table.pd-table{border-collapse:collapse;width:100%;font-size:8.5pt;font-family:'DM Sans',Calibri,Arial,sans-serif;table-layout:fixed;margin-top:0}
+table.pd-table th{background:#EDF1F7;color:${theme.navy};padding:7px 5px;text-align:center;border:1px solid #DEE5EF;font-weight:700;font-size:7.5pt;line-height:1.25;vertical-align:middle;cursor:default}
+table.pd-table td{padding:7px 5px;border:1px solid #DEE5EF;text-align:center;vertical-align:middle;word-wrap:break-word;line-height:1.3;color:#4A5568}
+table.pd-table td.pd-left{text-align:left}
+table.pd-table td.pd-date{background:#FBF3DF;color:#7A5B0A;font-weight:600}
+table.pd-table tr.pd-credit td{font-weight:700;background:#F8FAFC;color:${theme.navy}}
+table.pd-table tr.pd-credit td.pd-left{text-align:center}
+.pd-fisa-table{border-collapse:collapse;margin-top:16px;font-size:9pt;font-family:'DM Sans',Calibri,Arial,sans-serif;border-radius:6px;overflow:hidden}
+.pd-fisa-table td{padding:7px 16px;border:1px solid #DEE5EF}
+.pd-fisa-table td:first-child{background:${theme.navy};color:#fff;font-weight:700;letter-spacing:.03em}
+.pd-fisa-table td.pd-fisa-date{background:#FBF3DF;color:#7A5B0A;font-weight:700}
+`;
+}
+
+function esc(s){
+  return (s==null?'':s.toString()).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ---------- FORM VIEW ---------- */
+function currentRec(){ return programmes.find(p=>p.id===currentId); }
+
+function renderForm(){
+  renderTabsEl();
+  renderPanel();
+}
+
+function renderTabsEl(){
+  const rec = currentRec();
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = '';
+  stages.forEach((s,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (i===activeTab ? ' active':'');
+    const countText = s.rollout ? `${filledCount(rec,s)} module${filledCount(rec,s)===1?'':'s'}` : `${filledCount(rec,s)}/${totalCount(rec,s)}`;
+    btn.innerHTML = `
+      <div class="dot ${isStageComplete(rec,s)?'done':''}"></div>
+      <div class="tab-label">${s.label}</div>
+      <div class="tab-count">${countText}</div>
+    `;
+    btn.onclick = ()=>{ activeTab = i; renderForm(); };
+    tabsEl.appendChild(btn);
+  });
+  const done = stages.filter(s=>isStageComplete(rec,s)).length;
+  const badge = document.getElementById('overallBadge');
+  if(badge) badge.textContent = `${done} / ${stages.length} stages complete`;
+  const summaryEl = document.getElementById('summary');
+  if(done === stages.length){
+    summaryEl.style.display='block';
+    summaryEl.innerHTML = `<span>✓ All stages complete — this programme initiation record is ready.</span><button class="btn primary small" id="summaryDownloadBtn" style="background:var(--navy3)">Preview & Download</button><button class="btn gold small" id="summaryHandoverBtn">Hand Over to PM</button>`;
+    const sdb = document.getElementById('summaryDownloadBtn');
+    if(sdb) sdb.addEventListener('click', ()=>downloadRolloutSchedule(rec));
+    const shb = document.getElementById('summaryHandoverBtn');
+    if(shb) shb.addEventListener('click', ()=>openHandoverModal(rec));
+  } else {
+    summaryEl.style.display='none';
+  }
+}
+
+function renderPanel(){
+  const rec = currentRec();
+  const stage = stages[activeTab];
+  const panel = document.getElementById('panel');
+  if(stage.rollout){
+    renderRolloutPanel(rec, panel);
+  } else {
+    renderFieldPanel(rec, stage, panel);
+  }
+  document.getElementById('prevBtn').disabled = activeTab===0;
+  document.getElementById('nextBtn').textContent = activeTab===stages.length-1 ? 'Finish' : 'Next →';
+}
+
+function renderFieldPanel(rec, stage, panel){
+  const d = rec.data;
+  panel.innerHTML = `
+    <div class="stage-head">
+      <div><h2>${stage.label}</h2><p>${stage.desc}</p></div>
+    </div>
+    <div class="grid2" id="fieldsWrap"></div>
+    <div class="notes-box">
+      <label>Notes for this stage (internal, not shared)</label>
+      <textarea id="stageNotes" placeholder="Working notes for ${stage.label.toLowerCase()}...">${rec.notes[stage.key]||''}</textarea>
+    </div>
+  `;
+  const wrap = document.getElementById('fieldsWrap');
+  stage.fields.forEach(f=>{
+    if(!visibleField(f,d)) return;
+    const div = document.createElement('div');
+    div.className = 'field';
+    const val = d[f.id] || '';
+    const filledClass = val ? 'filled' : '';
+    let inputHtml;
+    if(f.type === 'select'){
+      inputHtml = `<select class="${filledClass}" data-id="${f.id}">
+          ${f.options.map(o=>`<option value="${o}" ${o===val?'selected':''}>${o||'Select...'}</option>`).join('')}
+        </select>`;
+    } else if(f.type === 'file'){
+      const files = Array.isArray(d[f.id]) ? d[f.id] : [];
+      inputHtml = `<div class="dropzone" data-dropzone="${f.id}">
+          <input type="file" data-fileid="${f.id}" multiple style="display:none">
+          <div class="dropzone-inner">
+            <div class="dropzone-icon">&#8593;</div>
+            <div class="dropzone-text">Drag &amp; drop files here, or <span class="dropzone-link">click to upload</span></div>
+          </div>
+        </div>
+        <div class="file-list" data-filelist="${f.id}" style="margin-top:6px">
+          ${files.map((fl,fi)=>`<div class="file-chip" style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0">
+            <a href="${fl.data}" download="${esc(fl.name)}">${esc(fl.name)}</a>
+            <button type="button" class="btn small danger" data-fileremove="${f.id}" data-fileidx="${fi}">Remove</button>
+          </div>`).join('') || '<div style="font-size:12px;color:#888">No files uploaded yet.</div>'}
+        </div>`;
+    } else if(f.history){
+      const opts = (peopleHistory[f.id]||[]);
+      inputHtml = `<input class="${filledClass}" type="text" data-id="${f.id}" value="${val}" list="dl_${f.id}" placeholder="Enter ${f.label.toLowerCase()}">
+        <datalist id="dl_${f.id}">${opts.map(o=>`<option value="${o}">`).join('')}</datalist>`;
+    } else if(f.type === 'textarea'){
+      inputHtml = `<textarea class="${filledClass}" data-id="${f.id}" placeholder="Enter ${f.label.toLowerCase()}">${val}</textarea>`;
+    } else {
+      inputHtml = `<input class="${filledClass}" type="${f.type}" data-id="${f.id}" value="${val}" placeholder="Enter ${f.label.toLowerCase()}">`;
+    }
+    div.innerHTML = `<label>${f.label}${f.required?'<span class="req">*</span>':''}</label>${inputHtml}<div class="errmsg" style="display:none"></div>`;
+    wrap.appendChild(div);
+  });
+
+  wrap.querySelectorAll('input,select,textarea').forEach(el=>{
+    el.addEventListener('input', e=>onFieldChange(e, stage));
+    el.addEventListener('blur', e=>validateField(e.target, stage));
+  });
+  function handleFilesForField(id, fileList){
+    const files = Array.from(fileList || []);
+    if(!files.length) return;
+    const rec2 = currentRec();
+    rec2.data[id] = Array.isArray(rec2.data[id]) ? rec2.data[id] : [];
+    let pending = files.length;
+    files.forEach(file=>{
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        rec2.data[id].push({name:file.name, data:reader.result});
+        pending--;
+        if(pending===0){
+          rec2.updatedAt = Date.now();
+          saveData();
+          renderPanel();
+          renderTabsEl();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  wrap.querySelectorAll('input[type=file]').forEach(el=>{
+    el.addEventListener('change', e=>{
+      handleFilesForField(e.target.dataset.fileid, e.target.files);
+      e.target.value = '';
+    });
+  });
+  wrap.querySelectorAll('[data-dropzone]').forEach(zone=>{
+    const id = zone.dataset.dropzone;
+    const fileInput = zone.querySelector('input[type=file]');
+    zone.addEventListener('click', ()=>fileInput.click());
+    ['dragenter','dragover'].forEach(evt=>{
+      zone.addEventListener(evt, e=>{
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add('dragover');
+      });
+    });
+    ['dragleave','dragend'].forEach(evt=>{
+      zone.addEventListener(evt, e=>{
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.remove('dragover');
+      });
+    });
+    zone.addEventListener('drop', e=>{
+      e.preventDefault(); e.stopPropagation();
+      zone.classList.remove('dragover');
+      handleFilesForField(id, e.dataTransfer.files);
+    });
+  });
+  wrap.querySelectorAll('[data-fileremove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.dataset.fileremove;
+      const idx = parseInt(e.target.dataset.fileidx,10);
+      const rec2 = currentRec();
+      if(Array.isArray(rec2.data[id])){
+        rec2.data[id].splice(idx,1);
+        rec2.updatedAt = Date.now();
+        saveData();
+        renderPanel();
+        renderTabsEl();
+      }
+    });
+  });
+  document.getElementById('stageNotes').addEventListener('input', e=>{
+    rec.notes[stage.key] = e.target.value;
+    rec.updatedAt = Date.now();
+    saveData();
+  });
+}
+
+function onFieldChange(e, stage){
+  const rec = currentRec();
+  const id = e.target.dataset.id;
+  rec.data[id] = e.target.value;
+  rec.updatedAt = Date.now();
+  const field = stage.fields.find(f=>f.id===id);
+  if(field && field.history && e.target.value.trim()){
+    peopleHistory[id] = peopleHistory[id] || [];
+    if(!peopleHistory[id].includes(e.target.value.trim())){
+      peopleHistory[id].unshift(e.target.value.trim());
+      peopleHistory[id] = peopleHistory[id].slice(0,20);
+    }
+  }
+  e.target.classList.toggle('filled', !!e.target.value);
+  validateField(e.target, stage);
+  saveData();
+  renderTabsEl();
+}
+
+function validateField(el, stage){
+  const id = el.dataset.id;
+  const field = stage.fields.find(f=>f.id===id);
+  if(!field) return;
+  const rec = currentRec();
+  const errBox = el.parentElement.querySelector('.errmsg');
+  let error = '';
+  if(field.required && !rec.data[id]){
+    error = `${field.label} is required.`;
+  } else if(field.afterField && rec.data[id] && rec.data[field.afterField]){
+    if(new Date(rec.data[id]) < new Date(rec.data[field.afterField])){
+      error = `${field.label} cannot be before ${stage.fields.find(f=>f.id===field.afterField).label}.`;
+    }
+  }
+  if(error){
+    el.classList.add('error');
+    errBox.textContent = error;
+    errBox.style.display = 'block';
+  } else {
+    el.classList.remove('error');
+    errBox.style.display = 'none';
+  }
+}
+
+/* ---------- ROLLOUT SCHEDULE PANEL ---------- */
+function renderRolloutPanel(rec, panel){
+  ensureRollout(rec);
+  const ro = rec.rollout;
+  panel.innerHTML = `
+    <div class="stage-head">
+      <div><h2>Rollout Schedule</h2><p>Module-by-module training and assessment timeline. Import from Excel or build manually.</p></div>
+    </div>
+    <div class="rollout-toolbar">
+      <div class="hint">${ro.sourceMeta ? `Linked to original file: <b>${escAttr(ro.sourceMeta.fileName)}</b> (sheet: ${escAttr(ro.sourceMeta.sheetName)}). Edits below can be written straight back into it.` : `Upload the client's rollout schedule spreadsheet (modules, subjects, and key dates) to populate this automatically.`}</div>
+      <button class="btn primary" id="importRolloutBtn">Import from Excel</button>
+      <button class="btn" id="addModuleBtn">+ Add Module</button>
+      <button class="btn gold" id="downloadRolloutBtn">Preview & Download</button>
+      <button class="btn" id="downloadStyledXlsxBtn">Download Editable Excel Schedule</button>
+      <button class="btn ${ro.sourceMeta?'':'disabled'}" id="downloadOriginalXlsxBtn" ${ro.sourceMeta?'':'disabled title="Import from Excel first — this exports the original file with your edits, not a generated copy"'}>Download Original Excel (with edits)</button>
+    </div>
+    <div id="rolloutReadiness"></div>
+    <div class="rollout-head-grid">
+      <div class="field">
+        <label>Qualification / Programme Title</label>
+        <input type="text" id="ro_qual" value="${escAttr(ro.qualificationTitle)}" placeholder="e.g. National Certificate: Business Analysis NQF 6">
+      </div>
+      <div class="field">
+        <label>Induction Date & Time</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="ro_indDate" value="${escAttr(ro.inductionDate)}" placeholder="YYYY-MM-DD" style="flex:1">
+          <input type="text" id="ro_indTime" value="${escAttr(ro.inductionTime)}" placeholder="e.g. 10h00 - 11h00" style="flex:1">
+        </div>
+      </div>
+    </div>
+    <div class="rollout-final" style="margin-bottom:18px">
+      <h3>Schedule Columns</h3>
+      <p style="font-size:8pt;color:var(--muted);margin:-6px 0 12px">This programme's milestone columns — detected on import, or the default set for manual entry. Rename, remove, or add columns to match this client's structure.</p>
+      <div id="colsWrap"></div>
+      <button class="btn small" id="addColBtn" style="margin-top:8px">+ Add Column</button>
+    </div>
+    <div id="modulesWrap"></div>
+    <div class="rollout-final">
+      <h3>FISA / Final Submission</h3>
+      <div class="grid3">
+        <div class="field" style="margin-bottom:0"><label>FISA Date</label><input type="text" id="ro_fisa" value="${escAttr(ro.fisaDate)}" placeholder="YYYY-MM-DD"></div>
+        <div class="field" style="margin-bottom:0"><label>Submission Date</label><input type="text" id="ro_sub" value="${escAttr(ro.submissionDate)}" placeholder="YYYY-MM-DD"></div>
+        <div class="field" style="margin-bottom:0"><label>Results Date</label><input type="text" id="ro_res" value="${escAttr(ro.resultsDate)}" placeholder="YYYY-MM-DD"></div>
+      </div>
+    </div>
+  `;
+  renderColumns(rec);
+  renderModules(rec);
+
+  document.getElementById('addColBtn').addEventListener('click', ()=>{
+    const used = new Set(ro.columns.map(c=>c.id));
+    let id = 'newColumn', n = 2;
+    while(used.has(id)){ id = 'newColumn'+n; n++; }
+    ro.columns.push({id, label:'New Column', cls:''});
+    touchRollout(rec);
+    renderColumns(rec);
+    renderModules(rec);
+  });
+
+  document.getElementById('ro_qual').addEventListener('input', e=>{ ro.qualificationTitle=e.target.value; touchRollout(rec); });
+  document.getElementById('ro_indDate').addEventListener('input', e=>{ ro.inductionDate=e.target.value; touchRollout(rec); });
+  document.getElementById('ro_indTime').addEventListener('input', e=>{ ro.inductionTime=e.target.value; touchRollout(rec); });
+  document.getElementById('ro_fisa').addEventListener('input', e=>{ ro.fisaDate=e.target.value; touchRollout(rec); });
+  document.getElementById('ro_sub').addEventListener('input', e=>{ ro.submissionDate=e.target.value; touchRollout(rec); });
+  document.getElementById('ro_res').addEventListener('input', e=>{ ro.resultsDate=e.target.value; touchRollout(rec); });
+  document.getElementById('addModuleBtn').addEventListener('click', ()=>{
+    ro.modules.push({title:`MODULE ${ro.modules.length+1}`, subjects:[]});
+    touchRollout(rec);
+    renderModules(rec);
+    renderTabsEl();
+  });
+  document.getElementById('importRolloutBtn').addEventListener('click', ()=>{
+    document.getElementById('rolloutFileInput').value = '';
+    document.getElementById('rolloutFileInput').click();
+  });
+  document.getElementById('downloadRolloutBtn').addEventListener('click', ()=>downloadRolloutSchedule(rec));
+  document.getElementById('downloadStyledXlsxBtn').addEventListener('click', ()=>downloadStyledRolloutXlsx(rec));
+  const origBtn = document.getElementById('downloadOriginalXlsxBtn');
+  if(ro.sourceMeta) origBtn.addEventListener('click', ()=>exportRolloutOriginalXLSX(rec));
+
+  const readinessEl = document.getElementById('rolloutReadiness');
+  const incompleteStages = stages.filter(s=>!isStageComplete(rec,s));
+  if(incompleteStages.length){
+    readinessEl.innerHTML = `<div style="background:var(--grey-bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:18px;font-size:8.5pt;color:var(--muted)">
+      Not all sections are complete yet (${incompleteStages.map(s=>s.label).join(', ')}). The downloaded document will include blank fields for missing data.
+    </div>`;
+  } else {
+    readinessEl.innerHTML = `<div style="background:var(--success-bg);border:1px solid var(--success);border-radius:var(--r);padding:10px 14px;margin-bottom:18px;font-size:8.5pt;color:var(--success);font-weight:700">
+      ✓ All sections complete — this document is ready to send to the client.
+    </div>`;
+  }
+}
+
+function touchRollout(rec){
+  rec.updatedAt = Date.now();
+  saveData();
+  renderTabsEl();
+}
+
+function escAttr(s){ return (s||'').toString().replace(/"/g,'&quot;'); }
+
+function renderColumns(rec){
+  const ro = rec.rollout;
+  const wrap = document.getElementById('colsWrap');
+  wrap.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">${ro.columns.map((c,ci)=>`
+    <div style="display:flex;align-items:center;gap:4px;background:var(--grey-bg);border:1px solid var(--border);border-radius:8px;padding:4px 4px 4px 8px">
+      <input type="text" value="${escAttr(c.label)}" data-ci="${ci}" class="col-label-input" style="border:none;background:transparent;font-size:8.5pt;width:${Math.max(60,c.label.length*7)}px">
+      <button data-ci="${ci}" data-act="delcol" title="Remove column" style="border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:9pt;padding:2px 4px">✕</button>
+    </div>`).join('')}</div>`;
+  wrap.querySelectorAll('.col-label-input').forEach(el=>{
+    el.addEventListener('input', e=>{
+      ro.columns[+e.target.dataset.ci].label = e.target.value;
+      touchRollout(rec);
+      renderModules(rec);
+    });
+  });
+  wrap.querySelectorAll('[data-act=delcol]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(ro.columns.length<=1){ showToast('At least one column is required'); return; }
+      const ci = +e.target.dataset.ci;
+      const removedId = ro.columns[ci].id;
+      ro.columns.splice(ci,1);
+      ro.modules.forEach(m=>m.subjects.forEach(s=>{ delete s[removedId]; }));
+      touchRollout(rec);
+      renderColumns(rec);
+      renderModules(rec);
+    });
+  });
+}
+
+function blankSubject(ro){
+  const s = { _status:'Not Started' };
+  ro.columns.forEach(c=>{ s[c.id]=''; });
+  return s;
+}
+
+/* Workflow stages a PI moves each topic/subject through inside the app — this is what turns
+   the rollout from a static schedule into a tracked pipeline, independent of whatever columns
+   happen to exist in the source spreadsheet. Kept as _status (underscore) so it's never treated
+   as a source-mapped column and never accidentally written back into the original file's cells. */
+const STATUS_OPTIONS = ['Not Started','Scheduled','Facilitated','Submitted','Complete'];
+const STATUS_COLORS = {
+  'Not Started':'#A0AEC0','Scheduled':'#D4A017','Facilitated':'#2D4A7A','Submitted':'#E03E15','Complete':'#1B7A4A'
+};
+function moduleProgress(m){
+  const total = m.subjects.length;
+  const done = m.subjects.filter(s=>(s._status||'Not Started')==='Complete').length;
+  return {done, total};
+}
+
+function renderModules(rec){
+  const ro = rec.rollout;
+  const wrap = document.getElementById('modulesWrap');
+  if(ro.modules.length===0){
+    wrap.innerHTML = `<div class="empty-state"><h3>No modules yet</h3><p>Import a rollout spreadsheet or click "+ Add Module" to build one manually.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = '';
+  ro.modules.forEach((m,mi)=>{
+    const card = document.createElement('div');
+    card.className = 'module-card';
+    const prog = moduleProgress(m);
+    card.innerHTML = `
+      <div class="module-card-head">
+        <input type="text" value="${escAttr(m.title)}" data-mi="${mi}" class="mod-title-input" placeholder="Module title">
+        <div class="module-credit">Credits: ${moduleCredits(m)}</div>
+        <div class="module-progress" title="Topics marked Complete">${prog.done}/${prog.total} complete</div>
+        <button class="btn small danger" data-mi="${mi}" data-act="delmod" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.3)">Remove Module</button>
+      </div>
+      <div class="subject-table-wrap">
+        <table class="subject-table">
+          <thead><tr>${ro.columns.map(c=>`<th>${escAttr(c.label)}</th>`).join('')}<th>Status</th><th></th></tr></thead>
+          <tbody>${m.subjects.map((s,si)=>`<tr>${ro.columns.map(c=>`<td><input type="text" class="${c.cls||''}" value="${escAttr(s[c.id])}" data-mi="${mi}" data-si="${si}" data-col="${c.id}"></td>`).join('')}<td><select class="status-select" data-mi="${mi}" data-si="${si}" style="border-color:${STATUS_COLORS[s._status||'Not Started']};color:${STATUS_COLORS[s._status||'Not Started']}">${STATUS_OPTIONS.map(opt=>`<option value="${opt}" ${(s._status||'Not Started')===opt?'selected':''}>${opt}</option>`).join('')}</select></td><td><button class="btn small danger" data-mi="${mi}" data-si="${si}" data-act="delsub">✕</button></td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="module-card-foot">
+        <button class="btn small" data-mi="${mi}" data-act="addsub">+ Add Subject</button>
+        <span style="font-size:8pt;color:var(--muted)">${m.subjects.length} subject${m.subjects.length===1?'':'s'}</span>
+      </div>
+    `;
+    wrap.appendChild(card);
+  });
+
+  wrap.querySelectorAll('.mod-title-input').forEach(el=>{
+    el.addEventListener('input', e=>{
+      ro.modules[+e.target.dataset.mi].title = e.target.value;
+      touchRollout(rec);
+    });
+  });
+  wrap.querySelectorAll('[data-act=delmod]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(!confirm('Remove this module and all its subjects?')) return;
+      ro.modules.splice(+e.target.dataset.mi,1);
+      touchRollout(rec);
+      renderModules(rec);
+    });
+  });
+  wrap.querySelectorAll('[data-act=addsub]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      ro.modules[+e.target.dataset.mi].subjects.push(blankSubject(ro));
+      touchRollout(rec);
+      renderModules(rec);
+    });
+  });
+  wrap.querySelectorAll('[data-act=delsub]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      ro.modules[+e.target.dataset.mi].subjects.splice(+e.target.dataset.si,1);
+      touchRollout(rec);
+      renderModules(rec);
+    });
+  });
+  wrap.querySelectorAll('table.subject-table input[data-col]').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const {mi,si,col} = e.target.dataset;
+      ro.modules[+mi].subjects[+si][col] = e.target.value;
+      if(col==='credits'){
+        card_updateCreditBadge();
+      }
+      touchRollout(rec);
+    });
+  });
+  wrap.querySelectorAll('select.status-select').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const {mi,si} = e.target.dataset;
+      ro.modules[+mi].subjects[+si]._status = e.target.value;
+      e.target.style.borderColor = STATUS_COLORS[e.target.value];
+      e.target.style.color = STATUS_COLORS[e.target.value];
+      card_updateCreditBadge();
+      touchRollout(rec);
+    });
+  });
+  function card_updateCreditBadge(){
+    wrap.querySelectorAll('.module-card').forEach((card,mi)=>{
+      const badge = card.querySelector('.module-credit');
+      if(badge) badge.textContent = `Credits: ${moduleCredits(ro.modules[mi])}`;
+      const prog = card.querySelector('.module-progress');
+      if(prog){ const p = moduleProgress(ro.modules[mi]); prog.textContent = `${p.done}/${p.total} complete`; }
+    });
+  }
+}
+
+/* ---------- EXCEL IMPORT ---------- */
+let pendingRolloutImport = null;
+
+let pendingSheetCandidates = null; // {sheetName: parsedResult} when workbook has >1 usable sheet
+let pendingRolloutFileB64 = null;  // exact source bytes, kept so edits can be written back into this same file
+let pendingRolloutFileName = null;
+
+document.getElementById('rolloutFileInput').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      pendingRolloutFileB64 = arrayBufferToBase64(e.target.result);
+      pendingRolloutFileName = file.name;
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const candidates = {};
+      wb.SheetNames.forEach(sheetName=>{
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd', defval:''});
+        if(rows.length < 3) return;
+        const parsed = parseRolloutRows(rows);
+        if(parsed.modules.length) candidates[sheetName] = parsed;
+      });
+      const names = Object.keys(candidates);
+      if(!names.length){
+        showToast('No modules detected — check file format');
+        return;
+      }
+      // Default to the sheet whose subject dates skew most recent/future — usually the live schedule
+      // rather than an old reference sheet left in the same workbook.
+      const score = name=>{
+        const p = candidates[name];
+        let recent = 0;
+        p.modules.forEach(m=>m.subjects.forEach(s=>Object.values(s).forEach(v=>{
+          const mm = /^(\d{4})-\d{2}-\d{2}$/.exec(v) || /-(\d{2,4})$/.exec(v);
+          if(mm){ const y = mm[1].length===2? (2000+ +mm[1]) : +mm[1]; if(y>=2025) recent++; }
+        })));
+        return recent;
+      };
+      names.sort((a,b)=>score(b)-score(a));
+      pendingSheetCandidates = names.length>1 ? candidates : null;
+      pendingRolloutImport = candidates[names[0]];
+      pendingRolloutImport._sheetName = names[0];
+      showImportReview(currentRec());
+    }catch(err){
+      showToast('Import failed — check file format');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function normCell(v){ return (v==null?'':v.toString()).trim(); }
+
+/* Turns a detected header label into a stable field id. Recognised metadata labels
+   map to the same ids the app already uses elsewhere (credits, type, level...);
+   anything else becomes its own generic column. */
+function colIdFor(label, used){
+  const low = label.toLowerCase();
+  let id;
+  if(/subject\s*code/.test(low)) id = 'subjectCode';
+  else if(/^unit|module\s*title|^module\s*\d*$|^block\s+\S/.test(low)) id = 'module';
+  else if(/^type$/.test(low)) id = 'type';
+  else if(/^level$/.test(low)) id = 'level';
+  else if(/credit/.test(low)) id = 'credits';
+  else if(/^facilitation$/.test(low)) id = 'facilitationDate';
+  else if(/^submission$/.test(low)) id = 'submissionDate';
+  else {
+    id = low.replace(/[^a-z0-9]+/g,' ').trim().replace(/ (.)/g,(m2,c)=>c.toUpperCase()).replace(/\s+/g,'') || 'col';
+  }
+  let base = id, n = 2;
+  while(used.has(id)){ id = base+n; n++; }
+  used.add(id);
+  return id;
+}
+
+function detectHeaderColumns(headerRow){
+  const used = new Set();
+  const cols = [];
+  headerRow.forEach((cell,ci)=>{
+    const label = normCell(cell);
+    if(!label) return;
+    const id = colIdFor(label, used);
+    cols.push({ci, id, label, cls: SUBJECT_LEVEL_COL_IDS.includes(id) && id!=='module' ? 'narrow' : (id==='module'?'wide':'')});
+  });
+  return cols;
+}
+
+/* Some sheets put the "MODULE n - Title" band in column A, others in column B — scan the first
+   few cells rather than assuming a fixed position. */
+function findModuleTitleCell(row){
+  for(let ci=0; ci<Math.min(row.length,4); ci++){
+    const v = normCell(row[ci]);
+    if(/^MODULE\s+\S/i.test(v) || /^BLOCK\s+\S/i.test(v)) return v;
+  }
+  return null;
+}
+
+/* True if the row looks like the sub-header of a "Topic 1..5" style module block
+   (a module name plus bare "Facilitation"/"Submission" column labels, no "Subject Code"). */
+function rowHasFacilitationOrSubmission(row){
+  return row.some(cell=>{
+    const v = normCell(cell).toLowerCase();
+    return v==='facilitation' || v==='submission';
+  });
+}
+
+/* Some sections are lone standalone titles (no "MODULE"/"BLOCK" prefix) that still lead into a
+   Topic-style sub-table — e.g. "Workplace Readiness Workshop". Recognised narrowly: the row must
+   have exactly one populated cell in its first few columns, and the row directly under it must
+   look like a Topic-style sub-header (bare "Facilitation"/"Submission" labels) rather than a
+   "Subject Code" BLOCK header — BLOCK-style standalone titles (e.g. "RE5 Workshop Preparation")
+   are deliberately excluded here since that shape isn't imported by this parser. */
+function soleLeadingCell(row, maxCols){
+  maxCols = maxCols || 4;
+  let found = null, count = 0;
+  for(let c=0;c<Math.min(row.length,maxCols);c++){
+    const v = normCell(row[c]);
+    if(v){ found = v; count++; }
+  }
+  return count===1 ? found : null;
+}
+function looksLikeStandaloneTopicTitle(row, nextRow){
+  const solo = soleLeadingCell(row);
+  if(!solo) return null;
+  if(normCell(nextRow[0]).toLowerCase() === 'subject code') return null;
+  return rowHasFacilitationOrSubmission(nextRow) ? solo : null;
+}
+
+function parseRolloutRows(rows){
+  const result = { qualificationTitle:'', inductionDate:'', inductionTime:'', modules:[], columns:null, fisaDate:'', submissionDate:'', resultsDate:'', skippedSections:0 };
+
+  // Qualification title: scan the first few rows / first few columns for a SAQA / National Certificate line
+  // rather than assuming it always sits in column A — sheets differ on which column it's in.
+  outer:
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const row = rows[r] || [];
+    for(let c=0;c<Math.min(row.length,5);c++){
+      const v = normCell(row[c]);
+      if(/national certificate|^saqa\b/i.test(v)){ result.qualificationTitle = v; break outer; }
+    }
+  }
+  // Induction line: scan the first ~10 rows / first few columns rather than assuming it always
+  // sits at row 3, column A — sheets differ on which row/column it lands in (mirrors the
+  // qualification-title scan above).
+  outerInd:
+  for(let r=0;r<Math.min(rows.length,10);r++){
+    const row = rows[r] || [];
+    for(let c=0;c<Math.min(row.length,5);c++){
+      const v = normCell(row[c]);
+      const m = v.match(/Induction:?\s*([^,]+),?\s*(.*)/i);
+      if(m){
+        result.inductionDate = parseLooseDate(m[1].trim());
+        result.inductionTime = (m[2]||'').trim();
+        break outerInd;
+      }
+    }
+  }
+
+  // Columns are unioned across every section as we go, since one file can legitimately mix
+  // table shapes (e.g. "Topic 1..5" modules alongside "Subject Code" BLOCK tables). Each
+  // section keeps its own local column layout for parsing; only the id/label/cls are merged
+  // into the shared column list used to render/export the whole schedule.
+  const columnsUnion = [];
+  const columnsSeen = new Set();
+  function addColsToUnion(cols){
+    cols.forEach(c=>{
+      if(columnsSeen.has(c.id)) return;
+      columnsSeen.add(c.id);
+      columnsUnion.push({id:c.id, label:c.label, cls:c.cls||''});
+    });
+  }
+  const TOPIC_COLS = [
+    {ci:0, id:'subjectCode', label:'Topic', cls:'narrow'},
+    {ci:1, id:'module', label:'Description', cls:'wide'},
+    {ci:2, id:'facilitationDate', label:'Facilitation', cls:''},
+    {ci:3, id:'submissionDate', label:'Submission', cls:''}
+  ];
+
+  // Standalone banner rows that sit between sections — a red "PHASE n" divider, or a purple
+  // "50% Internal Moderation" divider. Captured as plain text and attached to whichever module
+  // comes next, so the export can reproduce them without needing a dedicated data shape.
+  function findBannerCell(row, re){
+    for(let c=0;c<Math.min(row.length,6);c++){
+      const v = normCell(row[c]);
+      if(re.test(v)) return v;
+    }
+    return null;
+  }
+  let pendingPhaseLabel = null, pendingModerationLabel = null;
+
+  // Columns to the right of a Topic-style module's main 4 columns carry two extra kinds of info:
+  // short "➡️Provider" / all-caps region tags (e.g. "JHB & KZN"), and a two-box side panel — a
+  // left "Face-to-Face Practical Coaching"-style activity column paired with a right date grid
+  // ("Workshop"/"Facilitation", holding a variable number of day columns per module). Dates
+  // arrive here already normalised to YYYY-MM-DD by the sheet_to_json call that produced `rows`
+  // (dateNF:'yyyy-mm-dd'), so that shape is used to tell an activity-name cell from a date cell
+  // and reassemble the panel's real two-column structure rather than flattening it.
+  const DATE_CELL_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function extractExtras(rows, startRow, endRow){
+    const tags = [];
+    const seenTag = new Set();
+    let intro = null, leftTitle = '', rightTitle = '';
+    const items = [];
+    for(let r=startRow; r<=endRow; r++){
+      const row = rows[r] || [];
+      const rest = [];
+      for(let c=5; c<row.length; c++){
+        const v = normCell(row[c]);
+        if(!v) continue;
+        const isTag = v.includes('\u27A1') || /^[A-Z]{2,5}(\s*&\s*[A-Z]{2,5})+$/.test(v);
+        if(isTag){
+          const t = v.replace(/[\u27A1\uFE0F]/g,'').trim();
+          if(t && !seenTag.has(t)){ seenTag.add(t); tags.push(t); }
+          continue;
+        }
+        rest.push(v);
+      }
+      if(!rest.length) continue;
+      const dates = rest.filter(v=>DATE_CELL_RE.test(v));
+      const labels = rest.filter(v=>!DATE_CELL_RE.test(v));
+      if(dates.length===0 && labels.length===1 && intro===null && items.length===0){
+        intro = labels[0]; // lone descriptive caption sitting above the panel proper
+        continue;
+      }
+      if(dates.length===0 && labels.length>=1 && !rightTitle && items.length===0){
+        leftTitle = labels[0];
+        rightTitle = labels.length>1 ? labels[1] : '';
+        continue; // the two-box header row itself, not an activity entry
+      }
+      items.push({label: labels[0]||'', dates});
+    }
+    return {tags, panel: items.length ? {intro, leftTitle, rightTitle, items} : null};
+  }
+
+  let i = 0;
+  while(i < rows.length){
+    const row = rows[i] || [];
+    const phaseCell = findBannerCell(row, /^PHASE\s+\S/i);
+    if(phaseCell){ pendingPhaseLabel = phaseCell; i++; continue; }
+    const modCell = findBannerCell(row, /internal moderation/i);
+    if(modCell){ pendingModerationLabel = modCell; i++; continue; }
+    // "PoE Building / Logbook Sessions / Programme Close-Out" — a short label+date list, not a
+    // module table, so it's captured separately rather than forced into the modules array.
+    const closeOutCell = !result.closeOut && findBannerCell(row, /PoE Building|Programme Close-?Out/i);
+    if(closeOutCell){
+      i++;
+      const closeRows = [];
+      while(i < rows.length){
+        const r = rows[i] || [];
+        const label = normCell(r[0]);
+        if(!label) break;
+        if(findModuleTitleCell(r) || findBannerCell(r,/internal moderation|RE5 Workshop/i)) break;
+        const value = normCell(r[2]) || normCell(r[1]);
+        closeRows.push({label, value});
+        i++;
+      }
+      result.closeOut = {title: closeOutCell, rows: closeRows};
+      continue;
+    }
+    // "RE5 Workshop Preparation" — its own Subject-Code-style table with a different column set
+    // (Mock Exam V1/V2 instead of the main schedule's columns), plus a trailing milestone list.
+    // Kept in its own result.re5 rather than merged into the unified columns/modules.
+    const re5Cell = !result.re5 && findBannerCell(row, /RE5 Workshop Preparation/i);
+    if(re5Cell){
+      i++;
+      const headerRow = rows[i] || [];
+      if(normCell(headerRow[0]).toLowerCase() === 'subject code'){
+        const localCols = detectHeaderColumns(headerRow);
+        i++;
+        const re5Rows = [];
+        while(i < rows.length){
+          const r = rows[i] || [];
+          const c0 = normCell(r[0]);
+          if(!c0) break;
+          if(findModuleTitleCell(r) || findBannerCell(r,/internal moderation/i)) break;
+          const item = {};
+          localCols.forEach(c=>{ item[c.id] = normCell(r[c.ci]); });
+          re5Rows.push(item);
+          i++;
+        }
+        const milestones = [];
+        while(i < rows.length){
+          const r = rows[i] || [];
+          let label=null, value=null;
+          for(let c=0;c<r.length;c++){
+            const v = normCell(r[c]);
+            if(!v) continue;
+            if(!label){ label = v; continue; }
+            value = v; break;
+          }
+          if(!label) break;
+          milestones.push({label, value: value||''});
+          i++;
+        }
+        result.re5 = {title: re5Cell, columns: localCols.map(c=>({id:c.id,label:c.label})), rows: re5Rows, milestones};
+      }
+      continue;
+    }
+    const titleCell = findModuleTitleCell(row) || looksLikeStandaloneTopicTitle(row, rows[i+1] || []);
+    if(titleCell){
+      const moduleStartRow = i;
+      i++;
+      const nextRow = rows[i] || [];
+      const nextC0 = normCell(nextRow[0]).toLowerCase();
+
+      if(nextC0 === 'subject code'){
+        const localCols = detectHeaderColumns(nextRow);
+        i++;
+        addColsToUnion(localCols);
+        const subjects = [];
+        while(i < rows.length){
+          const r = rows[i] || [];
+          const c0 = normCell(r[0]);
+          if(c0.toUpperCase()==='CREDIT VALUE'){ i++; break; }
+          if(findModuleTitleCell(r)) break;
+          const hasTrailer = r.some(cell=>{
+            const v = normCell(cell).toLowerCase();
+            return v==='fisa' || v.startsWith('submis') || v==='results';
+          });
+          if(hasTrailer) break;
+          if(c0===''){ i++; break; }
+          const subj = { _ri:i, _ci:{} };
+          localCols.forEach(c=>{ subj[c.id] = normCell(r[c.ci]); subj._ci[c.id] = c.ci; });
+          subjects.push(subj);
+          i++;
+        }
+        result.modules.push({title: titleCell, subjects, phaseLabel: pendingPhaseLabel, moderationBefore: pendingModerationLabel});
+        pendingPhaseLabel = null; pendingModerationLabel = null;
+
+      } else if(rowHasFacilitationOrSubmission(nextRow)){
+        // "MODULE n" band followed by a sub-header row naming the module and marking
+        // Facilitation/Submission columns, then a run of "Topic 1..5" rows underneath it.
+        const moduleName = normCell(nextRow[0]);
+        const fullTitle = moduleName ? `${titleCell} \u2014 ${moduleName}` : titleCell;
+        i++;
+        addColsToUnion(TOPIC_COLS);
+        const subjects = [];
+        while(i < rows.length){
+          const r = rows[i] || [];
+          const c0 = normCell(r[0]);
+          if(!/^topic\s*\d*/i.test(c0)) break;
+          subjects.push({
+            subjectCode:c0, module:normCell(r[1]), facilitationDate:normCell(r[2]), submissionDate:normCell(r[3]),
+            _ri:i, _ci:{subjectCode:0, module:1, facilitationDate:2, submissionDate:3}
+          });
+          i++;
+        }
+        result.modules.push({title: fullTitle, subjects, phaseLabel: pendingPhaseLabel, moderationBefore: pendingModerationLabel, ...extractExtras(rows, moduleStartRow, i-1)});
+        pendingPhaseLabel = null; pendingModerationLabel = null;
+
+      } else {
+        // Title band whose contents don't match either recognised shape — skip past it rather
+        // than guess, so it doesn't silently drop or scramble data.
+        result.skippedSections++;
+      }
+    } else {
+      row.forEach((cell,j)=>{
+        const v = normCell(cell).toLowerCase();
+        const next = normCell(row[j+1]);
+        if(v==='fisa' && next) result.fisaDate = next;
+        else if(v.startsWith('submis') && next) result.submissionDate = next;
+        else if(v==='results' && next) result.resultsDate = next;
+      });
+      i++;
+    }
+  }
+  result.columns = (columnsUnion.length ? columnsUnion : cloneDefaultCols()).map(c=>({id:c.id, label:c.label, cls:c.cls||''}));
+  return result;
+}
+
+/* ---------- IMPORT REVIEW (confirm detected columns before saving) ---------- */
+function showImportReview(rec){
+  const p = pendingRolloutImport;
+  const body = document.getElementById('rolloutModalBody');
+  const sheetPicker = pendingSheetCandidates ? `
+    <div style="margin-bottom:14px">
+      <label style="font-size:8.5pt;color:var(--muted);display:block;margin-bottom:4px">This file has multiple sheets — choose which one to import:</label>
+      <select id="reviewSheetSelect" style="font-size:9pt;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+        ${Object.keys(pendingSheetCandidates).map(name=>`<option value="${escAttr(name)}" ${name===p._sheetName?'selected':''}>${escAttr(name)}</option>`).join('')}
+      </select>
+    </div>` : '';
+  const skippedNote = p.skippedSections ? `
+    <div style="background:#fff4e5;border:1px solid #f0c274;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:8.5pt;color:#7a4d00">
+      ${p.skippedSections} section${p.skippedSections===1?'':'s'} in this sheet use a different table layout than the rest and were not imported. Add those manually if needed.
+    </div>` : '';
+  body.innerHTML = `
+    <div class="stage-head">
+      <div><h2>Review Import</h2><p>${p.modules.length} module${p.modules.length===1?'':'s'} detected, ${p.modules.reduce((n,m)=>n+m.subjects.length,0)} subjects total. Confirm or adjust the detected columns before this replaces the current schedule.</p></div>
+    </div>
+    ${sheetPicker}
+    <div style="background:var(--grey-bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:8.5pt;color:var(--muted)">
+      Qualification: <b>${escAttr(p.qualificationTitle)||'—'}</b> &middot; Induction: <b>${escAttr(p.inductionDate)||'—'} ${escAttr(p.inductionTime)}</b>
+    </div>
+    ${skippedNote}
+    <h3 style="font-size:10pt;color:var(--navy);margin-bottom:8px">Detected Columns</h3>
+    <div id="reviewColsWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn primary" id="confirmImportBtn">Confirm Import</button>
+      <button class="btn" id="cancelImportBtn">Cancel</button>
+    </div>
+  `;
+  if(pendingSheetCandidates){
+    document.getElementById('reviewSheetSelect').addEventListener('change', e=>{
+      pendingRolloutImport = pendingSheetCandidates[e.target.value];
+      pendingRolloutImport._sheetName = e.target.value;
+      showImportReview(rec);
+    });
+  }
+  const colsWrap = document.getElementById('reviewColsWrap');
+  const renderReviewCols = ()=>{
+    colsWrap.innerHTML = p.columns.map((c,ci)=>`
+      <div style="display:flex;align-items:center;gap:4px;background:var(--grey-bg);border:1px solid var(--border);border-radius:8px;padding:4px 4px 4px 8px">
+        <input type="text" value="${escAttr(c.label)}" data-ci="${ci}" class="review-col-input" style="border:none;background:transparent;font-size:8.5pt;width:${Math.max(60,c.label.length*7)}px">
+        <button data-ci="${ci}" class="review-col-del" style="border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:9pt;padding:2px 4px">✕</button>
+      </div>`).join('');
+    colsWrap.querySelectorAll('.review-col-input').forEach(el=>{
+      el.addEventListener('input', e=>{ p.columns[+e.target.dataset.ci].label = e.target.value; });
+    });
+    colsWrap.querySelectorAll('.review-col-del').forEach(el=>{
+      el.addEventListener('click', e=>{
+        if(p.columns.length<=1){ showToast('At least one column is required'); return; }
+        const removedId = p.columns[+e.target.dataset.ci].id;
+        p.columns.splice(+e.target.dataset.ci,1);
+        p.modules.forEach(m=>m.subjects.forEach(s=>{ delete s[removedId]; }));
+        renderReviewCols();
+      });
+    });
+  };
+  renderReviewCols();
+
+  document.getElementById('confirmImportBtn').addEventListener('click', async ()=>{
+    const sheetName = pendingRolloutImport._sheetName;
+    delete pendingRolloutImport._sheetName;
+    delete pendingRolloutImport.skippedSections;
+    rec.rollout = pendingRolloutImport;
+    rec.rollout.sourceMeta = { fileName: pendingRolloutFileName, sheetName };
+    // Snapshot the as-imported value of every mapped cell. Write-back export diffs against this
+    // so only genuinely-edited cells get touched — everything else keeps its original Excel
+    // type (date/number/etc.) instead of being flattened to text.
+    rec.rollout.modules.forEach(m=>m.subjects.forEach(s=>{
+      if(s._ri==null) return;
+      s._orig = {};
+      rec.rollout.columns.forEach(c=>{ if(s._ci && s._ci[c.id]!=null) s._orig[c.id] = s[c.id]; });
+    }));
+    // Store the exact source bytes under this programme's own key — this is what write-back
+    // export re-opens later, so edits made in the app land in the ORIGINAL file's cells rather
+    // than a freshly generated look-alike.
+    try{
+      await window.storage.set(rolloutSourceKey(rec.id), JSON.stringify({ fileB64: pendingRolloutFileB64, fileName: pendingRolloutFileName, sheetName }), false);
+    }catch(err){
+      console.error(err);
+      showToast('Imported, but could not save the source file for write-back export');
+    }
+    pendingRolloutImport = null;
+    pendingSheetCandidates = null;
+    pendingRolloutFileB64 = null;
+    pendingRolloutFileName = null;
+    touchRollout(rec);
+    renderRolloutPanel(rec, document.getElementById('rolloutModalBody'));
+    renderTabsEl();
+    showToast('Import applied');
+  });
+  document.getElementById('cancelImportBtn').addEventListener('click', ()=>{
+    pendingRolloutImport = null;
+    pendingSheetCandidates = null;
+    pendingRolloutFileB64 = null;
+    pendingRolloutFileName = null;
+    renderRolloutPanel(rec, document.getElementById('rolloutModalBody'));
+  });
+}
+
+const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+function parseLooseDate(str){
+  const m = (str||'').match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if(!m) return (str||'').trim();
+  const day = m[1].padStart(2,'0');
+  const monthIdx = MONTHS.indexOf(m[2].toLowerCase());
+  if(monthIdx===-1) return str.trim();
+  const month = String(monthIdx+1).padStart(2,'0');
+  return `${m[3]}-${month}-${day}`;
+}
+
+document.getElementById('prevBtn').addEventListener('click', ()=>{ if(activeTab>0){activeTab--; renderForm();} });
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  if(activeTab<stages.length-1){activeTab++; renderForm();}
+  else { backToDashboard(); }
+});
+document.getElementById('copyBtn').addEventListener('click', ()=>copySummary(currentRec()));
+document.getElementById('rolloutDocBtn').addEventListener('click', openRolloutModal);
+document.getElementById('rolloutModalClose').addEventListener('click', closeRolloutModal);
+document.getElementById('rolloutModalOverlay').addEventListener('click', e=>{ if(e.target.id==='rolloutModalOverlay') closeRolloutModal(); });
+
+function openRolloutModal(){
+  const rec = currentRec();
+  ensureRollout(rec);
+  renderRolloutPanel(rec, document.getElementById('rolloutModalBody'));
+  document.getElementById('rolloutModalOverlay').classList.add('open');
+}
+function closeRolloutModal(){
+  document.getElementById('rolloutModalOverlay').classList.remove('open');
+}
+
+</script>
+</body>
+</html>
