@@ -4,7 +4,11 @@ Consolidated home for the ApexU QCTO Monitoring System - Supabase-backed build.
 
 ## What's here
 
-QCTO_v7_integrated.html - the working build. Auth runs on Supabase Auth (not local accounts). The Programmes tab reads/writes the real programmes table directly. Every other tab (Learners, Enrolments, EISA, Monitoring, Recommendations, Clients, Assessors, Attendance, PoE) still runs on its original local-storage path - not yet migrated.
+index.html - the working build (single-file app; this is the file that ships, not a separate QCTO_v7_integrated.html). Auth runs on Supabase Auth (not local accounts).
+
+Every tab - Programmes, Learners, Enrolments, EISA, Attendance, Attendance Sessions, PoE Checklist, Clients, Assessors, Monitoring Visits, and Recommendations - reads and writes to Supabase via a generic fetchRecords/createRecord/updateRecord/deleteRecord layer that hits the REST API directly (table mapping + typed-column handling in the SUPABASE section of index.html). localStorage is used only as an offline read cache and fallback, not as the primary data path - saveAll() mirrors state there after every Supabase write.
+
+Monitoring Visits, Recommendations, and PoE Checklist currently have zero rows in the database. The wiring is live; nobody has entered data through those tabs yet.
 
 ## Backend
 
@@ -16,8 +20,8 @@ Users are created in the Supabase dashboard (Authentication -> Users -> Invite),
 
 ## Known gaps
 
-Only Programmes is wired to Supabase so far; the rest still needs the same treatment (schema gaps get discovered per table - Programmes needed several new columns the original table didn't have).
+Monitoring Visits, Recommendations, and PoE Checklist tabs are wired but unused so far (0 rows) - confirm real users are entering data there, not just Programmes/Learners/EISA/Attendance.
 
-GitHub auto-sync is disabled (a previous version had a live token hardcoded in the client - removed). If sync comes back, it needs to go through a server-side proxy, never a token shipped in the HTML.
+GitHub auto-sync goes through a server-side proxy (/.netlify/functions/github-sync) rather than a token shipped in the HTML - keep it that way if sync logic changes.
 
 Related repos: apexu-qcto-sync (data snapshot store), project_initiator (PI intake tool - separate Supabase project, not yet bridged to this one), Apex1-Consol-apexu-reports (client report generator).
