@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'programme-initiation.html'
+      - 'report-generator.html'
+      - 'qcto-seta-links.html'
 
 jobs:
   deploy:
@@ -20,9 +23,12 @@ jobs:
           token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
           path: live-site
 
-      - name: Sync index.html
+      - name: Sync files
         run: |
           cp index.html live-site/index.html
+          cp programme-initiation.html live-site/programme-initiation.html
+          cp report-generator.html live-site/report-generator.html
+          cp qcto-seta-links.html live-site/qcto-seta-links.html
           cd live-site
           if git diff --quiet; then
             echo "No changes to deploy."
@@ -30,6 +36,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "Auto-deploy: sync index.html from ApexOne"
+          git add index.html programme-initiation.html report-generator.html qcto-seta-links.html
+          git commit -m "Auto-deploy: sync files from ApexOne"
           git push
