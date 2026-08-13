@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QCTO, SETA &amp; Related Bodies — Directory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1A365D;--navy2:#2D4A7A;--navy3:#10223B;
+  --red:#E03E15;--red2:#C2320E;--red-bg:#FFF0ED;
+  --gold:#D4A017;--gold2:#F0C040;
+  --success:#1B7A4A;--success-bg:#EDFBF3;
+  --grey:#A0AEC0;--grey-bg:#EDF1F7;
+  --muted:#718096;--body:#4A5568;--dark:#1E2533;
+  --border:#DEE5EF;--surface:#F8FAFC;--white:#FFFFFF;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+  --r:8px;--r2:12px;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+  --shadow2:0 4px 20px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100vh}
+#app{max-width:1180px;margin:0 auto;background:var(--surface);min-height:100vh;box-shadow:var(--shadow2)}
+
+#topbar{
+  background:linear-gradient(135deg,var(--navy3) 0%,var(--navy) 100%);
+  border-bottom:3px solid var(--red);
+  padding:18px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+}
+.brand h1{font-size:15pt;font-weight:800;color:#fff;letter-spacing:.1em;text-transform:uppercase}
+.brand span{font-size:8pt;color:var(--gold2);letter-spacing:.2em;text-transform:uppercase}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.btn{padding:9px 16px;border-radius:var(--r);font-weight:700;font-size:9.5pt;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--body);display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn:hover{background:var(--surface)}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover{background:var(--navy2)}
+
+#content{padding:28px 32px}
+
+.controls{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.controls input[type=text]{flex:1;min-width:220px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt;background:#fff}
+.controls select{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt;background:#fff}
+.result-count{font-size:8.5pt;color:var(--muted);margin-bottom:14px}
+
+.section{margin-bottom:26px}
+.section-title{font-size:10.5pt;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:8px}
+.section-title .count-badge{background:var(--grey-bg);color:var(--muted);font-size:8pt;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:none;letter-spacing:0}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:16px 18px;box-shadow:var(--shadow);transition:.15s}
+.card:hover{border-color:var(--navy2);box-shadow:var(--shadow2)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.card-title{font-weight:800;color:var(--navy);font-size:11pt;line-height:1.3}
+.card-tag{font-size:7.5pt;font-weight:700;padding:3px 9px;border-radius:12px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:var(--grey-bg);color:var(--muted)}
+.card-tag.qcto{background:#FFF6DA;color:#8A6D00}
+.card-tag.seta{background:var(--success-bg);color:var(--success)}
+.card-tag.gov{background:var(--red-bg);color:var(--red2)}
+.card-tag.vendor{background:#EAF1FF;color:#2251A8}
+.card-sub{font-size:8.5pt;color:var(--muted);margin-bottom:10px}
+.card-links{display:flex;gap:8px;flex-wrap:wrap}
+.card-links a{font-size:8.5pt;font-weight:700;color:var(--navy2);text-decoration:none;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r);display:inline-flex;align-items:center;gap:4px}
+.card-links a:hover{background:var(--surface);border-color:var(--navy2)}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state h3{color:var(--navy);font-size:13pt;margin-bottom:8px}
+
+@media (max-width:640px){
+  #topbar{padding:14px 16px}
+  #content{padding:18px 16px}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="brand">
+      <h1>QCTO / SETA Directory</h1>
+      <span>Quality Councils, SETAs &amp; Related Bodies</span>
+    </div>
+    <div class="topbar-actions">
+      <a class="btn primary" href="index.html">&#8592; Back to Hub</a>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="controls">
+      <input id="search" type="text" placeholder="Search by name, acronym, or sector… (e.g. merSETA, QCTO, construction)" autocomplete="off" oninput="renderAll()">
+      <select id="category-filter" onchange="renderAll()">
+        <option value="">All Categories</option>
+        <option value="qcto">QCTO &amp; National Bodies</option>
+        <option value="seta">SETAs</option>
+        <option value="vendor">Vendor Certifications</option>
+      </select>
+    </div>
+    <div class="result-count" id="result-count"></div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script>
+const ORGS = [
+  {name:"Quality Council for Trades and Occupations", acronym:"QCTO", cat:"qcto", tag:"National Body", desc:"Quality assurance body for occupational qualifications on the OQSF.", site:"https://www.qcto.org.za"},
+  {name:"South African Qualifications Authority", acronym:"SAQA", cat:"qcto", tag:"National Body", desc:"Oversees the National Qualifications Framework (NQF).", site:"https://www.saqa.org.za"},
+  {name:"Department of Higher Education and Training", acronym:"DHET", cat:"qcto", tag:"National Body", desc:"Government department overseeing post-school education and training, including SETAs.", site:"https://www.dhet.gov.za"},
+  {name:"National Skills Fund", acronym:"NSF", cat:"qcto", tag:"National Body", desc:"Funds national skills development priorities outside SETA mandates.", site:"https://www.nsf.gov.za"},
+
+  {name:"Agriculture Sector Education Training Authority", acronym:"AgriSETA", cat:"seta", tag:"SETA", desc:"Sector: Primary and secondary agriculture.", site:"https://www.agriseta.co.za"},
+  {name:"Banking Sector Education Training Authority", acronym:"BANKSETA", cat:"seta", tag:"SETA", desc:"Sector: Banking.", site:"https://www.bankseta.org.za"},
+  {name:"Chemical Industries Education Training Authority", acronym:"CHIETA", cat:"seta", tag:"SETA", desc:"Sector: Chemical, plastics, pharmaceuticals, glass.", site:"https://www.chieta.org.za"},
+  {name:"Construction Education Training Authority", acronym:"CETA", cat:"seta", tag:"SETA", desc:"Sector: Construction.", site:"https://ceta.org.za"},
+  {name:"Culture, Arts, Tourism, Hospitality and Sport Sector Education Training Authority", acronym:"CATHSSETA", cat:"seta", tag:"SETA", desc:"Sector: Culture, arts, tourism, hospitality, sport.", site:"https://www.cathsseta.org.za"},
+  {name:"Education, Training and Development Practices Sector Education Training Authority", acronym:"ETDP SETA", cat:"seta", tag:"SETA", desc:"Sector: Education, training and development practices.", site:"https://www.etdpseta.org.za"},
+  {name:"Energy and Water Sector Education Training Authority", acronym:"EWSETA", cat:"seta", tag:"SETA", desc:"Sector: Energy and water.", site:"https://www.ewseta.org.za"},
+  {name:"Fibre Processing and Manufacturing Sector Education Training Authority", acronym:"FP&M SETA", cat:"seta", tag:"SETA", desc:"Sector: Fibre processing, textiles, clothing, leather, print, packaging.", site:"https://www.fpmseta.org.za"},
+  {name:"Finance and Accounting Services Sector Education Training Authority", acronym:"FASSET", cat:"seta", tag:"SETA", desc:"Sector: Finance, accounting, management consulting and other financial services.", site:"https://www.fasset.org.za"},
+  {name:"Food and Beverages Manufacturing Industry Sector Education Training Authority", acronym:"FoodBev SETA", cat:"seta", tag:"SETA", desc:"Sector: Food and beverage manufacturing.", site:"https://www.foodbev.co.za"},
+  {name:"Health and Welfare Sector Education Training Authority", acronym:"HWSETA", cat:"seta", tag:"SETA", desc:"Sector: Health and social development.", site:"https://www.hwseta.org.za"},
+  {name:"Insurance Sector Education Training Authority", acronym:"INSETA", cat:"seta", tag:"SETA", desc:"Sector: Long-term and short-term insurance, re-insurance, and claims.", site:"https://www.inseta.org.za"},
+  {name:"Local Government Sector Education Training Authority", acronym:"LGSETA", cat:"seta", tag:"SETA", desc:"Sector: Local government and related institutions.", site:"https://www.lgseta.org.za"},
+  {name:"Manufacturing, Engineering and Related Services Sector Education Training Authority", acronym:"merSETA", cat:"seta", tag:"SETA", desc:"Sector: Manufacturing, engineering, motor, tyre, plastics, new tyre.", site:"https://www.merseta.org.za"},
+  {name:"Media, Information and Communication Technologies Sector Education Training Authority", acronym:"MICT SETA", cat:"seta", tag:"SETA", desc:"Sector: Media, information and communication technology, advertising, film.", site:"https://www.mict.org.za"},
+  {name:"Mining Qualifications Authority", acronym:"MQA", cat:"seta", tag:"SETA", desc:"Sector: Mining and minerals.", site:"https://www.mqa.org.za"},
+  {name:"Public Service Sector Education Training Authority", acronym:"PSETA", cat:"seta", tag:"SETA", desc:"Sector: National and provincial public service departments.", site:"https://www.pseta.org.za"},
+  {name:"Safety and Security Sector Education Training Authority", acronym:"SASSETA", cat:"seta", tag:"SETA", desc:"Sector: Safety, security, justice, correctional services, defence.", site:"https://www.sasseta.org.za"},
+  {name:"Services Sector Education Training Authority", acronym:"Services SETA", cat:"seta", tag:"SETA", desc:"Sector: Business services, hairdressing, cleaning, real estate, forensics, wholesale/retail motor.", site:"https://www.serviceseta.org.za"},
+  {name:"Transport Education Training Authority", acronym:"TETA", cat:"seta", tag:"SETA", desc:"Sector: Road, rail, air, water, taxi, pipeline transport, logistics.", site:"https://www.teta.org.za"},
+  {name:"Wholesale and Retail Sector Education Training Authority", acronym:"W&RSETA", cat:"seta", tag:"SETA", desc:"Sector: Wholesale and retail trade.", site:"https://www.wrseta.org.za"},
+
+  {name:"CompTIA", acronym:"CompTIA", cat:"vendor", tag:"Vendor Cert", desc:"International vendor-neutral IT certification body (A+, Network+, Security+, Cloud+, etc.). Not NQF-registered or QCTO/SETA-accredited — exam-based global certification, separate from the OQSF.", site:"https://www.comptia.org"}
+];
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderAll(){
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  const cat = document.getElementById('category-filter').value;
+  const filtered = ORGS.filter(o => {
+    const matchesCat = !cat || o.cat === cat;
+    const haystack = (o.name + ' ' + o.acronym + ' ' + o.desc).toLowerCase();
+    const matchesQ = !q || haystack.includes(q);
+    return matchesCat && matchesQ;
+  });
+
+  document.getElementById('result-count').textContent =
+    filtered.length + ' of ' + ORGS.length + ' bodies shown';
+
+  const results = document.getElementById('results');
+  if (!filtered.length){
+    results.innerHTML = '<div class="empty-state"><h3>No matches</h3><p>Try a different search term or category.</p></div>';
+    return;
+  }
+
+  const groups = [
+    {key:'qcto', label:'QCTO &amp; National Bodies'},
+    {key:'seta', label:'SETAs'},
+    {key:'vendor', label:'Vendor Certifications'}
+  ];
+
+  let html = '';
+  groups.forEach(g => {
+    const items = filtered.filter(o => o.cat === g.key);
+    if (!items.length) return;
+    html += '<div class="section">';
+    html += '<div class="section-title">' + g.label + '<span class="count-badge">' + items.length + '</span></div>';
+    html += '<div class="grid">';
+    items.forEach(o => {
+      html += '<div class="card">';
+      html += '<div class="card-top"><div class="card-title">' + escapeHtml(o.acronym) + '</div><span class="card-tag ' + o.cat + '">' + escapeHtml(o.tag) + '</span></div>';
+      html += '<div class="card-sub">' + escapeHtml(o.name) + '<br>' + escapeHtml(o.desc) + '</div>';
+      html += '<div class="card-links"><a href="' + escapeHtml(o.site) + '" target="_blank" rel="noopener">&#128279; Official Site</a></div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  results.innerHTML = html;
+}
+
+renderAll();
+</script>
+</body>
+</html>
