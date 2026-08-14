@@ -6839,11 +6839,6 @@ function initApp() {
         // Restores an existing Supabase session, or shows the login screen.
         restoreSession();
 
-        // Reset idle timer on any user activity
-        ['mousemove','keydown','mousedown','touchstart','scroll'].forEach(evt => {
-            document.addEventListener(evt, () => { if (state._loggedInUserId) resetIdleTimer(); }, { passive: true });
-        });
-
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
