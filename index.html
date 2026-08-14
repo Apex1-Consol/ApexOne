@@ -2255,10 +2255,14 @@ function firstLinked(fields, key) {
 async function buildTypedColumns(table, fields) {
     const cols = { tenant_id: await resolveTenantId() };
     switch (table) {
-        case 'Programmes':
+        case 'Programmes': {
             cols.programme_name = fields['Qualification'] || fields['Prog ID'] || 'Untitled Programme';
             cols.initiated_by_email = state.currentUserEmail || null;
+            const clientName = fields['Client'];
+            const clientRec = clientName ? (state.clients || []).find(r => r.fields['Company Name'] === clientName) : null;
+            cols.client_id = clientRec ? clientRec.id : null;
             break;
+        }
         case 'Learners':
             cols.first_name = fields['First Name'] || '';
             cols.last_name  = fields['Last Name']  || '';
@@ -2363,7 +2367,7 @@ async function updateRecord(table, recordId, fields) {
 
     try {
         const body = { fields: merged };
-        if (table === 'Attendance' || table === 'AttendanceSessions' || table === 'PoeChecklist' || table === 'EISA') {
+        if (table === 'Attendance' || table === 'AttendanceSessions' || table === 'PoeChecklist' || table === 'EISA' || table === 'Programmes') {
             Object.assign(body, await buildTypedColumns(table, merged));
         }
         const res = await fetch(`${SUPA_URL}/rest/v1/${supaTable}?id=eq.${encodeURIComponent(recordId)}`, {
