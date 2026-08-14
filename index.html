@@ -4593,11 +4593,13 @@ async function saveEditProgramme() {
     const id = document.getElementById('ep-id').value;
     const progId = document.getElementById('ep-progid').value.trim();
     if (!progId) { document.getElementById('ep-error').textContent = 'Prog ID is required.'; return; }
+    const epClientVal = document.getElementById('ep-client').value;
+    if (!epClientVal) { document.getElementById('ep-error').textContent = 'Client is required.'; return; }
     const fields = {
         'Prog ID':                       progId,
         'Entity':                        document.getElementById('ep-entity').value      || '',
         'Project Manager':               document.getElementById('ep-pm').value          || '',
-        'Client':                        document.getElementById('ep-client').value      || '',
+        'Client':                        epClientVal,
         'Type':                          document.getElementById('ep-type').value        || '',
         'Qualification':                 document.getElementById('ep-qual').value        || '',
         'SAQA ID':                       document.getElementById('ep-saqa').value        || '',
@@ -5569,11 +5571,13 @@ function openAddProgrammeModal() { populateClientSelects(); populateNqfSelects()
 async function saveProgramme() {
     const progId = document.getElementById('ap-progid').value.trim();
     if (!progId) { showToast('error','Prog ID is required'); return; }
+    const clientVal = document.getElementById('ap-client').value;
+    if (!clientVal) { showToast('error','Client is required — select the client this programme belongs to'); return; }
     const fields = {
         'Prog ID': progId,
         'Entity': document.getElementById('ap-entity').value,
         'Project Manager': document.getElementById('ap-pm').value,
-        'Client': document.getElementById('ap-client').value,
+        'Client': clientVal,
         'Type': document.getElementById('ap-type').value,
         'Qualification': document.getElementById('ap-qual').value,
         'SAQA ID': document.getElementById('ap-saqa').value,
