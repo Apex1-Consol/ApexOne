@@ -8,7 +8,6 @@ on:
       - 'programme-initiation.html'
       - 'report-generator.html'
       - 'qcto-seta-links.html'
-      - 'supabase/functions/**'
 
 jobs:
   deploy-static:
@@ -40,26 +39,3 @@ jobs:
           git add index.html programme-initiation.html report-generator.html qcto-seta-links.html
           git commit -m "Auto-deploy: sync files from ApexOne"
           git push
-
-  deploy-edge-functions:
-    runs-on: ubuntu-latest
-    # Only run when Edge Function files actually changed
-    if: |
-      contains(join(github.event.commits.*.modified, ' '), 'supabase/functions') ||
-      contains(join(github.event.commits.*.added, ' '), 'supabase/functions')
-    steps:
-      - name: Checkout ApexOne
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Deploy clickup-sync Edge Function
-        run: |
-          supabase functions deploy clickup-sync \
-            --project-ref nducwhlmudksgxggjrbo \
-            --no-verify-jwt
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
