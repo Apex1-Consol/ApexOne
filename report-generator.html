@@ -297,13 +297,19 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .cs-bar{height:4px;border-radius:2px;background:#e5e7eb;margin-top:8px;overflow:hidden}
 .cs-bar-fill{height:100%;border-radius:2px;transition:width .4s}
 .cs-big.ok{color:#1B7A4A}.cs-big.warn{color:#CC6B00}.cs-big.low{color:#C8272C}
-.mod-card{border-radius:var(--r);padding:14px;border:1px solid var(--border);position:relative;}
-.mod-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.mod-card{
+  border-radius:var(--r);padding:16px 15px;border:1px solid var(--border);position:relative;
+  background:#fff;min-height:88px;display:flex;flex-direction:column;
+  box-shadow:0 1px 2px rgba(15,23,42,.04);transition:box-shadow .15s,transform .15s;
+}
+.mod-card:hover{box-shadow:0 6px 16px rgba(15,23,42,.09);transform:translateY(-1px)}
+.mod-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0}
 .mod-card.m1::before{background:var(--mc,var(--m1))}
 .mod-card.m2::before{background:var(--mc,var(--m2))}
 .mod-card.m3::before{background:var(--mc,var(--m3))}
 .mod-card.m4::before{background:var(--mc,var(--m4))}
-.mod-num{font-size:7.5pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.mod-num{font-size:7.5pt;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.mod-num::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--mc,var(--border))}
 .mod-card.m1 .mod-num{color:var(--mc,var(--m1))}
 .mod-card.m2 .mod-num{color:var(--mc,var(--m2))}
 .mod-card.m3 .mod-num{color:var(--mc,var(--m3))}
@@ -312,27 +318,43 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .mod-connector{display:flex;align-items:center;margin-bottom:8px}
 .mod-connector .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .mod-connector .line{flex:1;height:2px}
-.mod-dates{font-size:8pt;color:var(--body);font-weight:500;line-height:1.4}
+.mod-dates{font-size:9pt;color:var(--dark);font-weight:700;line-height:1.4;letter-spacing:-.01em}
 .mod-dates-input{
-  font-size:8pt;color:var(--body);font-weight:500;line-height:1.4;
+  font-size:9pt;color:var(--dark);font-weight:700;line-height:1.4;
   border:none;border-bottom:1.5px dashed var(--border);background:transparent;
   width:100%;outline:none;font-family:var(--font);padding:1px 0;
   transition:.15s;cursor:text;
 }
 .mod-dates-input:hover{border-bottom-color:var(--navy2)}
 .mod-dates-input:focus{border-bottom-color:var(--navy);border-bottom-style:solid;}
-.mod-card:hover .mod-edit-hint{opacity:1}
-.mod-edit-hint{
-  position:absolute;bottom:6px;right:8px;font-size:7pt;color:var(--muted);
-  opacity:0;transition:.15s;pointer-events:none;letter-spacing:.04em;
-}
-@media print{.mod-dates-input{display:none!important}.mod-dates-print{display:block!important}.mod-edit-hint{display:none!important}}
-.mod-units{font-size:7.5pt;color:var(--muted);margin-top:6px;line-height:1.5}
+@media print{.mod-dates-input{display:none!important}.mod-dates-print{display:block!important}.cta{display:none!important}}
+.mod-units{font-size:7.5pt;color:var(--muted);margin-top:8px;line-height:1.6;letter-spacing:.02em}
 .mod-dates-print{display:none}
-.mod-card.needs-input{border-color:var(--gold);animation:pulse-border 2s ease-in-out infinite}
-.mod-card.needs-input .mod-edit-hint{opacity:1;color:var(--gold)}
-.mod-card.needs-input .mod-dates-input{border-bottom-color:var(--gold);border-bottom-style:solid}
-@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(212,160,23,.3)}50%{box-shadow:0 0 0 4px rgba(212,160,23,.15)}}
+
+/* Empty-state ("needs-input"): the free-text input is visually hidden
+   (kept in the DOM, still focusable/functional — the .cta pill focuses it
+   on click) and replaced by a calendar-icon pill tinted with this module's
+   OWN accent colour (--mc), not a generic warning colour. Border/background
+   go a soft dashed-neutral instead of a pulsing gold ring — reads as
+   "not filled in yet", not "error". */
+.mod-card.needs-input{border-style:dashed;border-color:#cbd5e1;background:#fbfcfd}
+.mod-card.needs-input .mod-dates-input{position:absolute;opacity:0;pointer-events:none;height:0}
+.mod-card.needs-input .cta{
+  display:inline-flex;align-items:center;gap:6px;font-size:8pt;font-weight:700;
+  color:var(--mc,var(--navy2));background:color-mix(in srgb,var(--mc,var(--navy2)) 12%,#fff);
+  padding:6px 11px;border-radius:20px;cursor:pointer;width:fit-content;transition:background .15s;
+}
+.mod-card.needs-input .cta:hover{background:color-mix(in srgb,var(--mc,var(--navy2)) 20%,#fff)}
+.mod-card.needs-input .cta svg{width:11px;height:11px;flex-shrink:0}
+
+/* Per-module completion bars — KM/PM/WM (QCTO) or Form/Sum (Legacy),
+   aggregated across all learners. Red at 0%, amber mid-way, teal at 100%. */
+.mod-formsum-wrap{margin-top:auto;padding-top:9px;border-top:1px solid var(--border)}
+.mod-formsum{font-size:7.5pt;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:5px}
+.mod-formsum b{color:var(--dark);font-weight:700}
+.fs-bar{height:3px;border-radius:2px;background:#e5e7eb;overflow:hidden;margin-bottom:5px}
+.fs-bar:last-child{margin-bottom:0}
+.fs-bar-fill{height:100%;border-radius:2px}
 .info-card.needs-input{border-left-color:var(--gold)!important;cursor:pointer}
 .info-card.needs-input:hover{background:var(--warn-bg)}
 .info-card.needs-input span::after{content:' — click ✏ to fill in';font-size:7.5pt;color:var(--gold);font-style:italic;font-weight:400}
@@ -4462,18 +4484,64 @@ function getLearnerRiskLabel(l){
   const pct=nyc/total;
   return pct===0?'Low':pct<=0.5?'Medium':'High';
 }
+// Per-module KM/PM/WM completion counts across all learners in this programme
+// (QCTO/occupational only). Mirrors the per-learner NYC-flagging logic in
+// computeExecStats — same eisaState + narratives._eisa override pattern —
+// but tallies "C" counts instead of just detecting any NYC.
+function computeQctoModuleProgress(modNums,pLearners){
+  const ov=narratives._eisa||{};
+  const out={};
+  modNums.forEach(m=>{
+    const counts={km:0,pm:0,wm:0};
+    pLearners.forEach(l=>{
+      const res=(eisaState[l.id]||{})[m]||{};
+      const ek=`${l.id}_m${m}`;
+      const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
+      ['km','pm','wm'].forEach(f=>{if(mv(f,res[f])==='C')counts[f]++;});
+    });
+    out[m]={km:counts.km,pm:counts.pm,wm:counts.wm,total:pLearners.length};
+  });
+  return out;
+}
+// Per-module Formative/Summative completion counts across all learners
+// (Legacy only) — units grouped by u.mod, same grouping used by the
+// flagging logic above and by buildLegacyAssessmentPages.
+function computeLegacyModuleProgress(modNums,prog,pLearners){
+  const ov=narratives._eisa||{};
+  const unitsByMod={};
+  unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).forEach(u=>{
+    const m=u.mod||1;(unitsByMod[m]=unitsByMod[m]||[]).push(u);
+  });
+  const out={};
+  modNums.forEach(m=>{
+    const units=unitsByMod[m]||[];
+    let fDone=0,sDone=0,total=0;
+    pLearners.forEach(l=>{
+      units.forEach(u=>{
+        total++;
+        if(ov[usFormativeKey(l.id,u.id)]==='C')fDone++;
+        if(ov[usSummativeKey(l.id,u.id)]==='C')sDone++;
+      });
+    });
+    out[m]={fDone,sDone,total};
+  });
+  return out;
+}
 function buildOverviewPage(prog,client,pLearners,pn=2){
   const nar=narratives;
   const p=activeProvider||PROVIDERS.apex;
   const legacy=isLegacyProgramme(prog);
   const modNums=displayModuleNums(prog);
+  const qctoProgress=legacy?null:computeQctoModuleProgress(modNums,pLearners);
+  const legacyProgress=legacy?computeLegacyModuleProgress(modNums,prog,pLearners):null;
   const mods=modNums.map(n=>{
     const modUnits=unitStandards.filter(u=>u.mod===n&&(!u.saqa_id||u.saqa_id===prog.saqa_id));
     const unitStr=modUnits.length?modUnits.map(u=>u.id).join(' · '):(legacy?'':`KM-0${n} · PM-0${n} · WM-0${n}`);
     // cls is a legacy CSS hook (.mod-card.m1..m4); harmless beyond m4 since the
     // inline --mc custom property (set below) always overrides the CSS fallback colour.
     const fieldMap=moduleFieldMap(modNums);
-    return{cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr};
+    return{cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
+      qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null};
   });
   let body=`
     <div class="sec-header"><div class="sec-accent" style="background:${p.accentFrom}"></div>
@@ -4494,19 +4562,37 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     <div class="module-timeline">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
       const st=modStatus(m.dates);const stStyle=st?MOD_STATUS_STYLE[st]:null;
+      const needsInput=!m.dates;
+      // Calendar icon CTA replaces the free-text placeholder for an empty
+      // date field — tinted with this module's own accent colour (--mc)
+      // rather than a generic warning colour, so the empty state still
+      // reads as "this module", not "an error".
+      const calIcon=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
+      const barColor=(pct)=>pct<=0?'#C8272C':pct>=100?'#0F6B6B':'#D4A017';
+      const bar=(label,done,total)=>{
+        const pct=total>0?Math.round(done/total*100):0;
+        return `<div class="mod-formsum"><span>${label}</span><b>${done}/${total}</b></div><div class="fs-bar"><div class="fs-bar-fill" style="width:${pct}%;background:${barColor(pct)}"></div></div>`;
+      };
+      let progressHtml='';
+      if(m.qp&&m.qp.total>0){
+        progressHtml=`<div class="mod-formsum-wrap">${bar('KM',m.qp.km,m.qp.total)}${bar('PM',m.qp.pm,m.qp.total)}${bar('WM',m.qp.wm,m.qp.total)}</div>`;
+      } else if(m.lp&&m.lp.total>0){
+        progressHtml=`<div class="mod-formsum-wrap">${bar('Form',m.lp.fDone,m.lp.total)}${bar('Sum',m.lp.sDone,m.lp.total)}</div>`;
+      }
       return `
-      <div class="mod-card ${m.cls}${!m.dates?' needs-input':''}" style="--mc:${c}">
-        <div class="mod-edit-hint">${m.dates?'✎ click to edit':'✎ add dates'}</div>
+      <div class="mod-card ${m.cls}${needsInput?' needs-input':''}" style="--mc:${c}">
         ${stStyle?`<div class="mod-status-tag" style="background:${stStyle.bg};color:${stStyle.fg}">${stStyle.label}</div>`:''}
         <div class="mod-num">${m.label}</div>
         <input class="mod-dates-input no-print" type="text"
           value="${esc(m.dates)}"
-          placeholder="e.g. 09 Feb – 04 May 2026"
+          placeholder="Add dates"
           data-mod-field="${m.field}"
           onblur="saveModDates(this)"
           onkeydown="if(event.key==='Enter')this.blur()">
+        ${needsInput?`<div class="cta no-print" onclick="this.previousElementSibling.focus()">${calIcon}Add dates</div>`:''}
         <div class="mod-dates-print">${esc(m.dates||'—')}</div>
         <div class="mod-units">${m.units}</div>
+        ${progressHtml}
       </div>`;}).join('')}
     </div>
     <div id="overview-narratives" class="sec-header" style="margin-top:12px"><div class="sec-accent" style="background:var(--red)"></div>
@@ -13204,6 +13290,17 @@ function _updateProgressPanel(){
     return attDates.every(d=>a[d]&&a[d]!=='');
   });
   items.push({id:'att',label:'Attendance',state:allAttFilled?'done':attFilled?'partial':'',anchor:'att'});
+
+  // 2b. Module dates — every module card needs a date range before send,
+  // so a report can never go out showing an unfilled "Add dates" card to
+  // the client (export already strips the UI for a missing date, but an
+  // empty module timeline is still incomplete information either way).
+  if(activeProgramme){
+    const modNumsForCheck=displayModuleNums(activeProgramme);
+    const fieldMapForCheck=moduleFieldMap(modNumsForCheck);
+    const modsWithDates=modNumsForCheck.filter(n=>activeProgramme[fieldMapForCheck[n]]);
+    items.push({id:'moddates',label:'Module Dates',state:modsWithDates.length===modNumsForCheck.length?'done':modsWithDates.length>0?'partial':'',anchor:null});
+  }
 
   // NOTE: EISA is a single qualification-level assessment, not administered
   // per module — so it's tracked via the "EISA" overview narrative field
