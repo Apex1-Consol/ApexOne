@@ -235,6 +235,14 @@
         .data-table td{padding:10px 14px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-subtle);background:var(--bg-card);transition:background var(--transition-fast);}
         .data-table tr:hover td{background:var(--bg-card-hover);}
         .data-table tr.highlighted td{background:rgba(29,93,166,0.1);}
+        /* Wide tables (Programme Ledger, Client Register, Learners Registry): freeze the
+           leftmost identifying column so it stays visible while scrolling right — without
+           it there's no way to tell which row you're looking at once you've scrolled. */
+        .sticky-col .data-table th:first-child,
+        .sticky-col .data-table td:first-child{position:sticky;left:0;z-index:5;box-shadow:2px 0 6px rgba(0,0,0,0.25);}
+        .sticky-col .data-table th:first-child{z-index:15;}
+        .sticky-col .data-table tr:hover td:first-child{background:var(--bg-card-hover);}
+        .blank-cell{color:var(--text-muted);font-style:italic;opacity:0.75;}
         .filter-bar{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
         .filter-group{display:flex;flex-direction:column;gap:4px;}
         .filter-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:600;}
@@ -764,7 +772,7 @@
                     <div class="metric-card accent-gold">
                         <div class="metric-header"><div class="metric-title">Total Learners</div><div class="metric-icon">&#128101;</div></div>
                         <div class="metric-value" id="kpi-total-learners">0</div>
-                        <div class="metric-change positive" title="Sums the 'Learners' field entered on each programme record — not a live count of the Learners Registry, so it can drift from the record count shown on Reports & Analytics.">&#9650; Sum across all programmes</div>
+                        <div class="metric-change positive" title="Distinct learners by ID number (v_learner_kpis) — the same canonical count shown on Reports & Analytics. Falls back to a per-programme sum if that view can't be reached.">&#9650; Distinct learners (by ID)</div>
                         <div class="metric-formula">programmes.Learners sum</div>
                     </div>
                     <div class="metric-card">
@@ -863,7 +871,7 @@
                         <div class="filter-group"><label class="filter-label">Status</label><select id="filter-programmes-status" class="filter-select" onchange="filterVisibleTable('table-programmes')"><option value="">All</option><option value="Active">Active</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option><option value="Completed">Completed</option></select></div>
                         <div class="filter-group"><span class="filter-label">&nbsp;</span><button class="btn btn-secondary btn-sm" onclick="clearFiltersFor('table-programmes')">Clear</button></div>
                     </div>
-                    <div class="table-wrapper">
+                    <div class="table-wrapper sticky-col">
                         <table class="data-table" id="table-programmes">
                             <thead><tr><th>Prog ID</th><th>Stage</th><th>Entity</th><th>Project Manager</th><th>Client</th><th>Type</th><th>Qualification</th><th>SAQA ID</th><th>NQF</th><th>Learners</th><th>Status</th><th>Accreditation End</th><th>EISA Start</th><th>EISA End</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-programmes"></tbody>
@@ -895,7 +903,7 @@
                         <div class="filter-group"><label class="filter-label">Employment</label><select id="filter-learners-employment" class="filter-select" onchange="renderLearnersTable(true)"><option value="">All</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option></select></div>
                         <div class="filter-group"><span class="filter-label">&nbsp;</span><button class="btn btn-secondary btn-sm" onclick="clearFiltersFor('table-learners')">Clear</button></div>
                     </div>
-                    <div class="table-wrapper">
+                    <div class="table-wrapper sticky-col">
                         <table class="data-table mobile-card-table" id="table-learners">
                             <thead><tr><th>Learner ID</th><th>National ID</th><th>First Name</th><th>Last Name</th><th>DOB</th><th>Gender</th><th>Province</th><th>Email</th><th>Phone</th><th>Employment</th><th>Programme</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-learners"></tbody>
@@ -1022,7 +1030,7 @@
                 <!-- KPI summary row -->
                 <div class="report-kpi-row" id="report-kpi-row">
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-programmes">—</div><div class="report-kpi-lbl">Programmes</div></div>
-                    <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-learners">—</div><div class="report-kpi-lbl">Total Learners</div><div style="font-size:9px;color:var(--text-muted);margin-top:2px;" title="Counts every row in the Learners Registry. The Dashboard's Total Learners instead sums the 'Learners' field entered on each programme — the two numbers track different things and won't always match.">learner records</div></div>
+                    <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-learners">—</div><div class="report-kpi-lbl">Total Learners</div><div style="font-size:9px;color:var(--text-muted);margin-top:2px;" title="Distinct learners by ID number (v_learner_kpis) — the same canonical count shown on the Dashboard. See Learners Registry for the full row count, which includes duplicate seed-data rows.">distinct, by ID</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-avg-kma" style="color:var(--accent-gold);">—</div><div class="report-kpi-lbl">Avg KMA Score</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-eisa-ready" style="color:var(--accent-emerald);">—</div><div class="report-kpi-lbl">EISA Ready</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-visits">—</div><div class="report-kpi-lbl">Total Visits</div></div>
@@ -1091,7 +1099,7 @@
                         <div class="quick-stat"><span>Total Clients:</span><span class="quick-stat-value" id="clients-total">0</span></div>
                         <div class="quick-stat"><span>Active MOUs:</span><span class="quick-stat-value" id="clients-active-mou">0</span></div>
                     </div>
-                    <div class="table-wrapper">
+                    <div class="table-wrapper sticky-col">
                         <table class="data-table" id="table-clients">
                             <thead><tr>
                                 <th>Company Name</th>
@@ -1761,7 +1769,11 @@ const state = {
     attendance: [],
     attendanceSessions: [],
     poe: [],
-    programModules: []
+    programModules: [],
+    // Reconciled KPI views (v_learner_kpis, v_clickup_sync_health) — null until
+    // fetchDashboardExtras() resolves; every reader falls back gracefully.
+    learnerKpis: null,
+    clickupSyncHealth: null
 };
 
 let currentVisitModalId = null;
@@ -2191,6 +2203,40 @@ function tableToSupaName(table) {
         'PoeChecklist':    'poe_checklist'
     };
     return map[table] || null;
+}
+
+// ── Reconciled KPI views (v_learner_kpis, v_clickup_sync_health) ──────
+// These are Postgres views (security_invoker, RLS-respecting) that compute
+// a single canonical number server-side instead of every page re-deriving
+// its own count. See apexone-data-cleanup-flags for why "Total Learners"
+// needs this: the Learners Registry has many duplicate rows from a seed
+// script, so a plain row count and a per-programme sum can legitimately
+// disagree. distinct_learners here is the number both the Dashboard and
+// Reports & Analytics should show.
+async function fetchDashboardExtras() {
+    try {
+        const headers = await supaHeaders();
+        const [kpiRes, syncRes] = await Promise.all([
+            fetch(`${SUPA_URL}/rest/v1/v_learner_kpis?select=*`, { headers }),
+            fetch(`${SUPA_URL}/rest/v1/v_clickup_sync_health?select=*`, { headers })
+        ]);
+        if (kpiRes.ok) {
+            const rows = await kpiRes.json();
+            state.learnerKpis = rows[0] || null;
+        } else {
+            console.error('v_learner_kpis fetch error:', kpiRes.status, await kpiRes.text());
+        }
+        if (syncRes.ok) {
+            const rows = await syncRes.json();
+            state.clickupSyncHealth = rows[0] || null;
+        } else {
+            console.error('v_clickup_sync_health fetch error:', syncRes.status, await syncRes.text());
+        }
+    } catch (e) {
+        console.error('fetchDashboardExtras error:', e);
+        // Both stay null — every reader already falls back to its old
+        // behaviour when state.learnerKpis / state.clickupSyncHealth is null.
+    }
 }
 
 // ── FETCH: load all records from Supabase into state ──────────────────
@@ -2700,6 +2746,13 @@ function formatDate(isoStr) {
     return d.toLocaleDateString('en-ZA', {day:'numeric',month:'long',year:'numeric'});
 }
 function pickName(val) { return Array.isArray(val) ? val.join(', ') : (val || ''); }
+// Renders a table cell's primary identifying value, or a clearly-labelled
+// fallback instead of a blank cell when it's missing — an empty cell reads
+// as a bug ("did this not load?"), a label reads as "no data yet."
+function blankCellLabel(val, fallback) {
+    const v = (val ?? '').toString().trim();
+    return v ? escapeHtml(v) : `<span class="blank-cell">${escapeHtml(fallback)}</span>`;
+}
 function numOrNull(val) {
     if (val === '' || val === null || val === undefined) return null;
     const n = Number(val);
@@ -2997,7 +3050,12 @@ function updateProgrammeChartsFromState() {
         if (emp === 'Employed') employed++;
         else if (emp === 'Unemployed') unemployed++;
     });
-    document.getElementById('kpi-total-learners').textContent = totalLearners || state.learners.length;
+    const kpiEl = document.getElementById('kpi-total-learners');
+    if (state.learnerKpis) {
+        kpiEl.textContent = state.learnerKpis.distinct_learners;
+    } else {
+        kpiEl.textContent = totalLearners || state.learners.length;
+    }
     document.getElementById('kpi-active-programmes').textContent = state.programmes.length;
     document.getElementById('kpi-employed').textContent = employed;
     document.getElementById('kpi-unemployed').textContent = unemployed;
@@ -3193,9 +3251,9 @@ async function loadProgrammes() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-record-id', r.id);
             tr.innerHTML = `
-                <td>${escapeHtml(f['Prog ID']||'')}</td>
+                <td>${blankCellLabel(f['Prog ID'], '— No Prog ID —')}</td>
                 <td>${programmeStageBadge(f['__stage'])}</td>
-                <td>${escapeHtml(f['Entity']||'')}</td>
+                <td>${blankCellLabel(f['Entity'], '— No entity —')}</td>
                 <td>${escapeHtml(f['Project Manager']||'')}</td>
                 <td>${escapeHtml(f['Client']||'')}</td>
                 <td>${escapeHtml(f['Type']||'')}</td>
@@ -3293,7 +3351,7 @@ function renderLearnersTable(resetPage) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-record-id', r.id);
         tr.innerHTML = `
-            <td data-label="Learner ID">${escapeHtml(f['Learner ID']||String(r.id).slice(-6))}</td>
+            <td data-label="Learner ID">${escapeHtml(f['Learner ID']||String(r.id).slice(-6))}${(!f['First Name'] && !f['Last Name']) ? ' <span class="blank-cell" title="No name on this record">&#9888; unnamed</span>' : ''}</td>
             <td data-label="National ID">${escapeHtml(f['National ID']||'')}</td>
             <td data-label="First Name">${escapeHtml(f['First Name']||'')}</td>
             <td data-label="Last Name">${escapeHtml(f['Last Name']||'')}</td>
@@ -4419,7 +4477,7 @@ function renderReportKpis() {
     const now = new Date(); now.setHours(0,0,0,0);
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     set('rpt-kpi-programmes', state.programmes.length);
-    set('rpt-kpi-learners',   state.learners.length);
+    set('rpt-kpi-learners',   state.learnerKpis ? state.learnerKpis.distinct_learners : state.learners.length);
 
     // avg KMA
     let kmaSum = 0, kmaCnt = 0;
@@ -4828,7 +4886,7 @@ async function loadClients() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-record-id', r.id);
             tr.innerHTML = `
-                <td><strong>${escapeHtml(f['Company Name']||'')}</strong></td>
+                <td><strong>${blankCellLabel(f['Company Name'], '— Unnamed client —')}</strong></td>
                 <td>${escapeHtml(f['Contact Person']||'')}</td>
                 <td>${escapeHtml(f['Email']||'')}</td>
                 <td>${escapeHtml(f['Phone']||'')}</td>
@@ -5379,7 +5437,18 @@ function renderHealthCheck() {
         items.push({ cls:'warn', icon:'📂', label:`${emptyProgs.length} programme${emptyProgs.length>1?'s':''} with no learners`, detail: emptyProgs.slice(0,3).map(p => p.fields['Prog ID']||String(p.id).slice(-6)).join(', ') + (emptyProgs.length>3?' …':'') });
     }
 
-    // 6. localStorage usage warning
+    // 6. ClickUp sync health (v_clickup_sync_health) — surfaces silent sync
+    // breakage instead of leaving it sitting unnoticed in clickup_sync_failures.
+    if (state.clickupSyncHealth) {
+        const h = state.clickupSyncHealth;
+        if (h.failures_7d > 0) {
+            items.push({ cls:'crit', icon:'🔗', label:`${h.failures_7d} ClickUp sync failure${h.failures_7d>1?'s':''} in the last 7 days`, detail:`${h.failures_30d} in the last 30 days. Most recent: ${h.most_recent_failure_at ? new Date(h.most_recent_failure_at).toLocaleString() : 'unknown'}.` });
+        } else {
+            items.push({ cls:'ok', icon:'🔗', label:'ClickUp sync healthy', detail: h.failures_30d > 0 ? `0 failures in the last 7 days (${h.failures_30d} in the last 30).` : 'No sync failures in the last 30 days.' });
+        }
+    }
+
+    // 7. localStorage usage warning
     try {
         const used = JSON.stringify(localStorage).length;
         const pct  = Math.round((used / 5242880) * 100);
@@ -6211,7 +6280,7 @@ function checkExpiryWarnings() {
 // ===================== REFRESH ALL =====================
 async function refreshAllData() {
     loadData();
-    await Promise.all([loadProgrammes(), loadLearners()]);
+    await Promise.all([loadProgrammes(), loadLearners(), fetchDashboardExtras()]);
     await Promise.all([
         loadEnrolments(),
         loadEisa(), loadProgramModules(), loadMonitoring(), loadRecommendations(), loadClients(), loadAssessors(),
