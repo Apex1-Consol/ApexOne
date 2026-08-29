@@ -2495,10 +2495,16 @@ async function auditLog(action, table, recordId, changes) {
 function summarizeAuditValue(v) {
     if (v == null) return '';
     if (typeof v !== 'object') return String(v).slice(0, 30);
-    const entries = Object.entries(v).filter(([,val]) => val !== null && val !== '' && !(Array.isArray(val) && !val.length));
+    const entries = Object.entries(v).filter(([k,val]) => k !== 'fields' && val !== null && val !== '' && !(Array.isArray(val) && !val.length));
     if (!entries.length) return '{}';
     return entries.slice(0, 3)
-        .map(([k, val]) => `${k}=${String(Array.isArray(val) ? val.join(',') : val).slice(0, 18)}`)
+        .map(([k, val]) => {
+            let shown;
+            if (Array.isArray(val)) shown = val.join(',');
+            else if (typeof val === 'object') shown = JSON.stringify(val);
+            else shown = String(val);
+            return `${k}=${shown.slice(0, 18)}`;
+        })
         .join(', ') + (entries.length > 3 ? ', …' : '');
 }
 
