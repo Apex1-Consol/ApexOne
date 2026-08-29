@@ -217,6 +217,7 @@
         .container-header h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px;}
         .container-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
         .btn{padding:10px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;transition:all var(--transition-fast);display:inline-flex;align-items:center;gap:8px;border:none;}
+        .btn:disabled{opacity:.4;cursor:not-allowed;}
         .btn-primary{background:linear-gradient(135deg,var(--accent-primary),#164A80);color:#FFF;}
         .btn-primary:hover{background:linear-gradient(135deg,#164A80,#164A80);transform:translateY(-1px);box-shadow:var(--shadow-md);}
         .btn-secondary{background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-subtle);}
@@ -763,7 +764,7 @@
                     <div class="metric-card accent-gold">
                         <div class="metric-header"><div class="metric-title">Total Learners</div><div class="metric-icon">&#128101;</div></div>
                         <div class="metric-value" id="kpi-total-learners">0</div>
-                        <div class="metric-change positive">&#9650; Sum across all programmes</div>
+                        <div class="metric-change positive" title="Sums the 'Learners' field entered on each programme record — not a live count of the Learners Registry, so it can drift from the record count shown on Reports & Analytics.">&#9650; Sum across all programmes</div>
                         <div class="metric-formula">programmes.Learners sum</div>
                     </div>
                     <div class="metric-card">
@@ -889,8 +890,9 @@
                         </div>
                     </div>
                     <div class="filter-bar">
-                        <div class="filter-group"><label class="filter-label">Province</label><input id="filter-learners-province" class="filter-input" type="text" placeholder="e.g. Gauteng" oninput="filterVisibleTable('table-learners')"></div>
-                        <div class="filter-group"><label class="filter-label">Employment</label><select id="filter-learners-employment" class="filter-select" onchange="filterVisibleTable('table-learners')"><option value="">All</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option></select></div>
+                        <div class="filter-group"><label class="filter-label">Search name / ID</label><input id="filter-learners-search" class="filter-input" type="text" placeholder="e.g. Rankoko or 9901195574082" oninput="renderLearnersTable(true)"></div>
+                        <div class="filter-group"><label class="filter-label">Province</label><input id="filter-learners-province" class="filter-input" type="text" placeholder="e.g. Gauteng" oninput="renderLearnersTable(true)"></div>
+                        <div class="filter-group"><label class="filter-label">Employment</label><select id="filter-learners-employment" class="filter-select" onchange="renderLearnersTable(true)"><option value="">All</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option></select></div>
                         <div class="filter-group"><span class="filter-label">&nbsp;</span><button class="btn btn-secondary btn-sm" onclick="clearFiltersFor('table-learners')">Clear</button></div>
                     </div>
                     <div class="table-wrapper">
@@ -898,6 +900,11 @@
                             <thead><tr><th>Learner ID</th><th>National ID</th><th>First Name</th><th>Last Name</th><th>DOB</th><th>Gender</th><th>Province</th><th>Email</th><th>Phone</th><th>Employment</th><th>Programme</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-learners"></tbody>
                         </table>
+                    </div>
+                    <div id="learners-pager" style="display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 0 4px;">
+                        <button class="btn btn-secondary btn-sm" onclick="learnersGoToPage(-1)">&larr; Prev</button>
+                        <span style="font-size:11px;color:var(--text-muted);" id="learners-page-label">Page 1</span>
+                        <button class="btn btn-secondary btn-sm" onclick="learnersGoToPage(1)">Next &rarr;</button>
                     </div>
                 </div>
             </section>
@@ -1015,7 +1022,7 @@
                 <!-- KPI summary row -->
                 <div class="report-kpi-row" id="report-kpi-row">
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-programmes">—</div><div class="report-kpi-lbl">Programmes</div></div>
-                    <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-learners">—</div><div class="report-kpi-lbl">Total Learners</div></div>
+                    <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-learners">—</div><div class="report-kpi-lbl">Total Learners</div><div style="font-size:9px;color:var(--text-muted);margin-top:2px;" title="Counts every row in the Learners Registry. The Dashboard's Total Learners instead sums the 'Learners' field entered on each programme — the two numbers track different things and won't always match.">learner records</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-avg-kma" style="color:var(--accent-gold);">—</div><div class="report-kpi-lbl">Avg KMA Score</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-eisa-ready" style="color:var(--accent-emerald);">—</div><div class="report-kpi-lbl">EISA Ready</div></div>
                     <div class="report-kpi"><div class="report-kpi-val" id="rpt-kpi-visits">—</div><div class="report-kpi-lbl">Total Visits</div></div>
@@ -1794,10 +1801,14 @@ async function doLogin() {
         document.getElementById('login-pass').focus();
         return;
     }
-    await onAuthenticated(data.user);
+    await onAuthenticated(data.user, true);
 }
 
-async function onAuthenticated(user) {
+// isFreshLogin distinguishes an actual sign-in (doLogin) from restoring an
+// existing session on page load/reload (restoreSession) — both used to call
+// this the same way, so the "Welcome" toast fired on every single page load,
+// not just when someone actually logged in.
+async function onAuthenticated(user, isFreshLogin = false) {
     const rawRole = user.app_metadata?.role || 'operations'; // app_metadata only — matches DB RLS; user_metadata is client-editable, not a trustworthy role source
     const roles   = rolesToArray(rawRole);
     const name    = user.app_metadata?.name || user.user_metadata?.name || user.email;
@@ -1813,14 +1824,28 @@ async function onAuthenticated(user) {
     applyRoleVisibility(roles);
     applyActionVisibility();
     loadData();
-    refreshAllData();
+    // If the user reaches Reports & Analytics before this initial fetch
+    // finishes (e.g. clicking straight there right after login), its KPIs
+    // render off whatever was in state at that instant — which could be
+    // empty/stale — and nothing repaints them once the real data lands.
+    // Re-render once the fetch completes if Reports is still the open tab,
+    // so the numbers there always end up matching the source tables.
+    refreshAllData().then(() => { if (state.currentView === 'reports') renderReports(); });
     loadAdminNotifications();
     if (_notifPollTimer) clearInterval(_notifPollTimer);
     _notifPollTimer = setInterval(loadAdminNotifications, 60000);
     const roleLabel = roles.map(r => ROLE_LABELS[r] || r).join(' + ');
     const sidebarInfo = document.getElementById('sidebar-user-info');
     if (sidebarInfo) sidebarInfo.textContent = name + ' · ' + roleLabel;
-    showToast('success', 'Welcome, ' + name + ' — ' + roleLabel);
+    if (isFreshLogin) showToast('success', 'Welcome, ' + name + ' — ' + roleLabel);
+
+    // Deep-link support: a page like programme-initiation.html can link to
+    // index.html#view=clients and land straight on that module instead of
+    // always dropping the user on the Dashboard.
+    const requestedView = (location.hash.match(/view=([a-z]+)/i) || [])[1];
+    if (requestedView && document.getElementById('view-' + requestedView)) {
+        switchTab(requestedView);
+    }
 }
 
 async function doLogout() {
@@ -1994,10 +2019,30 @@ function renderUserList() {
         Invite (or select an existing user) → set <strong>Raw App Meta Data</strong> to e.g.
         <code style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;">{"role":"project_manager","name":"Thabo N","tenant":"apex-academy"}</code>.
         For users with two roles, use an array: <code style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;">{"role":["project_manager","etqa"],...}</code>.<br><br>
-        Use <em>Raw App Meta Data</em>, not <em>Raw User Meta Data</em> — the latter can be edited by the user themselves and isn't trusted for role checks.
+        Use <em>Raw App Meta Data</em>, not <em>Raw User Meta Data</em> — the latter can be edited by the user themselves and isn't trusted for role checks.<br><br>
+        <button class="btn btn-secondary btn-sm" onclick="copyAuthTemplate()">&#128203; Copy JSON template</button>
+        <a href="https://supabase.com/dashboard/project/nducwhlmudksgxggjrbo/auth/users" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;">&#8599; Open Supabase → Users</a>
     </div>`;
 }
-function openAddUserModal() { showToast('info', 'Add users via the Supabase dashboard — see the Users tab for instructions.'); }
+// The gold "+ Add User" button used to just pop a toast that repeated
+// instructions already on this page — a dead-looking primary CTA. It now
+// does the two things an admin actually needs: copies the Raw App Meta Data
+// JSON template to the clipboard and opens the Supabase Auth Users page,
+// so the admin can paste straight into the "Raw App Meta Data" field.
+function openAddUserModal() {
+    copyAuthTemplate();
+    window.open('https://supabase.com/dashboard/project/nducwhlmudksgxggjrbo/auth/users', '_blank', 'noopener');
+}
+function copyAuthTemplate() {
+    const template = '{"role":"project_manager","name":"Full Name","tenant":"apex-academy"}';
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(template)
+            .then(() => showToast('success', 'Template copied — paste into Raw App Meta Data in the Supabase dashboard.'))
+            .catch(() => showToast('info', 'Copy this into Raw App Meta Data: ' + template));
+    } else {
+        showToast('info', 'Copy this into Raw App Meta Data: ' + template);
+    }
+}
 function saveUserModal() { /* no-op — form removed, see renderUserList() */ }
 
 // ── CHANGE OWN PASSWORD ───────────────────────────────────────────────
@@ -2443,6 +2488,20 @@ async function auditLog(action, table, recordId, changes) {
     }
 }
 
+// Turns one value from an audit_log.changes entry into a short readable
+// string for the table cell. Previously this just ran String(v), which for
+// the common case — v being the full record object stored under "new" or
+// "deleted" — produced the literal text "[object Object]" for every row.
+function summarizeAuditValue(v) {
+    if (v == null) return '';
+    if (typeof v !== 'object') return String(v).slice(0, 30);
+    const entries = Object.entries(v).filter(([,val]) => val !== null && val !== '' && !(Array.isArray(val) && !val.length));
+    if (!entries.length) return '{}';
+    return entries.slice(0, 3)
+        .map(([k, val]) => `${k}=${String(Array.isArray(val) ? val.join(',') : val).slice(0, 18)}`)
+        .join(', ') + (entries.length > 3 ? ', …' : '');
+}
+
 async function loadAuditLog(filters = {}) {
     const container = document.getElementById('audit-log-tbody');
     const countEl   = document.getElementById('audit-log-count');
@@ -2476,7 +2535,7 @@ async function loadAuditLog(filters = {}) {
             const tLabel  = tableLabels[r.table_name] || r.table_name;
             const dt      = new Date(r.created_at);
             const dtStr   = dt.toLocaleDateString('en-ZA', {day:'numeric',month:'short',year:'numeric'}) + ' ' + dt.toLocaleTimeString('en-ZA', {hour:'2-digit',minute:'2-digit'});
-            const changes = r.changes ? Object.entries(r.changes).slice(0,3).map(([k,v]) => `${k}: ${String(v).slice(0,30)}`).join(' · ') : '';
+            const changes = r.changes ? Object.entries(r.changes).slice(0,3).map(([k,v]) => `${k}: ${summarizeAuditValue(v)}`).join(' · ') : '';
             return `<tr>
                 <td style="font-size:11px;color:var(--text-muted);">${escapeHtml(dtStr)}</td>
                 <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:${color}22;color:${color};">${escapeHtml(r.action)}</span></td>
@@ -2756,8 +2815,23 @@ function globalSearch(query) {
         recommendations:'table-recommendations', clients:'table-clients',
         assessors:'table-assessors', reports:'table-compliance-summary'
     };
+    // Learners Registry is paginated (only the current page's rows exist in
+    // the DOM), so the generic "hide non-matching <tr> elements" approach
+    // below would only ever search whatever 50 rows happen to be on screen.
+    // Route it through the same search field the paginated table already
+    // filters on instead.
+    if (state.currentView === 'learners') {
+        const searchInput = document.getElementById('filter-learners-search');
+        if (searchInput) searchInput.value = query;
+        renderLearnersTable(true);
+        if (searchBox) {
+            if (lower === '') searchBox.style.borderColor = '';
+            else searchBox.style.borderColor = getFilteredLearners().length ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+        }
+    }
+
     const tableId = idMap[state.currentView];
-    if (tableId) {
+    if (tableId && state.currentView !== 'learners') {
         const table = document.getElementById(tableId);
         if (table) {
             let matchCount = 0;
@@ -2891,7 +2965,9 @@ function clearFiltersFor(tableId) {
     } else if (tableId === 'table-monitoring') {
         ['filter-monitoring-judgment','filter-monitoring-eisa'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     } else if (tableId === 'table-learners') {
-        ['filter-learners-province','filter-learners-employment'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        ['filter-learners-search','filter-learners-province','filter-learners-employment'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        renderLearnersTable(true);
+        return;
     }
     const table = document.getElementById(tableId);
     if (table) table.querySelectorAll('tbody tr').forEach(row => row.style.display = '');
@@ -3153,39 +3229,96 @@ async function loadProgrammes() {
     applyActionVisibility();
 }
 
+// Learners Registry is by far the largest table in the app (hundreds of
+// records) — rendering every row into the DOM at once made the page slow
+// to load and scroll, and the only filters available were Province/Employment
+// with no way to search for a specific learner. loadLearners() now just
+// fetches + stores the data; renderLearnersTable() handles search, filtering
+// and pagination (LEARNERS_PAGE_SIZE per page) against state.learners.
+const LEARNERS_PAGE_SIZE = 50;
+let learnersPage = 1;
+
 async function loadLearners() {
     try {
         const records = await fetchRecords('Learners');
         state.learners = records;
-        const tbody = document.getElementById('tbody-learners');
-        tbody.innerHTML = '';
-        if (!records.length) { tbody.innerHTML = '<tr><td colspan="12" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No learners yet — use Import Excel or Add button.</td></tr>'; }
-        records.forEach(r => {
-            const f = r.fields || {};
-            const tr = document.createElement('tr');
-            tr.setAttribute('data-record-id', r.id);
-            tr.innerHTML = `
-                <td data-label="Learner ID">${escapeHtml(f['Learner ID']||String(r.id).slice(-6))}</td>
-                <td data-label="National ID">${escapeHtml(f['National ID']||'')}</td>
-                <td data-label="First Name">${escapeHtml(f['First Name']||'')}</td>
-                <td data-label="Last Name">${escapeHtml(f['Last Name']||'')}</td>
-                <td data-label="DOB">${escapeHtml(f['DOB']||'')}</td>
-                <td data-label="Gender">${escapeHtml(f['Gender']||'')}</td>
-                <td data-label="Province">${escapeHtml(f['Province']||'')}</td>
-                <td data-label="Email">${escapeHtml(f['Email']||'')}</td>
-                <td data-label="Phone">${escapeHtml(f['Phone']||'')}</td>
-                <td data-label="Employment">${escapeHtml(f['Employment']||'')}</td>
-                <td data-label="Programme">${escapeHtml(pickName(f['Programme Name']))}</td>
-                <td data-label="Actions"><button class="btn btn-secondary btn-sm" onclick="openEditLearner('${r.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="deleteRow('Learners','${r.id}',loadLearners)">Del</button></td>`;
-            tbody.appendChild(tr);
-        });
-        const rows = tbody.querySelectorAll('tr');
-        const ls = document.getElementById('learners-showing'), lt = document.getElementById('learners-total');
-        if (ls) ls.textContent = rows.length; if (lt) lt.textContent = rows.length;
+        renderLearnersTable(true);
         updateProgrammeChartsFromState();
         populateLearnerSelects();
     } catch(e) { console.error(e); showToast('error','Failed to load Learners'); }
     applyActionVisibility();
+}
+
+function getFilteredLearners() {
+    const search = (document.getElementById('filter-learners-search')?.value || '').trim().toLowerCase();
+    const prov   = (document.getElementById('filter-learners-province')?.value || '').trim().toLowerCase();
+    const emp    = (document.getElementById('filter-learners-employment')?.value || '').toLowerCase();
+    return state.learners.filter(r => {
+        const f = r.fields || {};
+        if (prov && !String(f['Province']||'').toLowerCase().includes(prov)) return false;
+        if (emp && String(f['Employment']||'').toLowerCase() !== emp) return false;
+        if (search) {
+            const hay = [f['Learner ID'], f['National ID'], f['First Name'], f['Last Name'], r.id]
+                .map(v => String(v||'').toLowerCase()).join(' ');
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+}
+
+function renderLearnersTable(resetPage) {
+    if (resetPage) learnersPage = 1;
+    const tbody = document.getElementById('tbody-learners');
+    if (!tbody) return;
+    const filtered = getFilteredLearners();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / LEARNERS_PAGE_SIZE));
+    if (learnersPage > totalPages) learnersPage = totalPages;
+    if (learnersPage < 1) learnersPage = 1;
+    const start = (learnersPage - 1) * LEARNERS_PAGE_SIZE;
+    const pageRecords = filtered.slice(start, start + LEARNERS_PAGE_SIZE);
+
+    tbody.innerHTML = '';
+    if (!filtered.length) {
+        const msg = state.learners.length ? 'No learners match your search/filters.' : 'No learners yet — use Import Excel or Add button.';
+        tbody.innerHTML = `<tr><td colspan="12" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">${escapeHtml(msg)}</td></tr>`;
+    }
+    pageRecords.forEach(r => {
+        const f = r.fields || {};
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-record-id', r.id);
+        tr.innerHTML = `
+            <td data-label="Learner ID">${escapeHtml(f['Learner ID']||String(r.id).slice(-6))}</td>
+            <td data-label="National ID">${escapeHtml(f['National ID']||'')}</td>
+            <td data-label="First Name">${escapeHtml(f['First Name']||'')}</td>
+            <td data-label="Last Name">${escapeHtml(f['Last Name']||'')}</td>
+            <td data-label="DOB">${escapeHtml(f['DOB']||'')}</td>
+            <td data-label="Gender">${escapeHtml(f['Gender']||'')}</td>
+            <td data-label="Province">${escapeHtml(f['Province']||'')}</td>
+            <td data-label="Email">${escapeHtml(f['Email']||'')}</td>
+            <td data-label="Phone">${escapeHtml(f['Phone']||'')}</td>
+            <td data-label="Employment">${escapeHtml(f['Employment']||'')}</td>
+            <td data-label="Programme">${escapeHtml(pickName(f['Programme Name']))}</td>
+            <td data-label="Actions"><button class="btn btn-secondary btn-sm" onclick="openEditLearner('${r.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="deleteRow('Learners','${r.id}',loadLearners)">Del</button></td>`;
+        tbody.appendChild(tr);
+    });
+
+    const ls = document.getElementById('learners-showing'), lt = document.getElementById('learners-total');
+    if (ls) ls.textContent = filtered.length ? `${start+1}-${start+pageRecords.length}` : '0';
+    if (lt) lt.textContent = state.learners.length;
+    const pageLabel = document.getElementById('learners-page-label');
+    if (pageLabel) pageLabel.textContent = `Page ${learnersPage} of ${totalPages}`;
+    const pager = document.getElementById('learners-pager');
+    if (pager) {
+        const [prevBtn, , nextBtn] = pager.children;
+        if (prevBtn) prevBtn.disabled = learnersPage <= 1;
+        if (nextBtn) nextBtn.disabled = learnersPage >= totalPages;
+    }
+}
+
+function learnersGoToPage(delta) {
+    learnersPage += delta;
+    renderLearnersTable(false);
+    document.querySelector('#view-learners .table-wrapper')?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 async function loadEnrolments() {
@@ -6083,7 +6216,16 @@ async function refreshAllData() {
 }
 
 function clearAllData() {
-    if (confirm('🗑️ Clear All Data?\n\nThis will permanently delete all programmes, learners, visits, clients, assessors and records.\n\nYour login is kept. This cannot be undone.\n\nAre you sure?')) {
+    // A plain confirm() is easy to click through out of habit for an action
+    // this destructive (it wipes the shared Supabase data, not just this
+    // browser's cache). Requiring the admin to type DELETE adds real friction
+    // without adding a whole extra modal.
+    const typed = prompt('⚠️ Clear ALL data?\n\nThis permanently deletes every programme, learner, visit, client, assessor and record for ALL users — not just this device. Your login is kept. This cannot be undone.\n\nType DELETE (all caps) to confirm:');
+    if (typed !== 'DELETE') {
+        if (typed !== null) showToast('info', 'Clear All Data cancelled — input did not match "DELETE".');
+        return;
+    }
+    {
         state.programmes             = [];
         state.learners               = [];
         state.enrolments             = [];
