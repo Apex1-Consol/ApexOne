@@ -252,11 +252,14 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .page-header-right{font-size:7.5pt;color:rgba(255,255,255,.35);font-family:var(--mono)}
 .page-body{padding:28px 40px;flex:1}
 .page-footer{
-  background:var(--surface);border-top:1px solid var(--border);
-  padding:10px 40px;display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);border-top:3px solid;border-image:linear-gradient(90deg,#1A365D,#0F6B6B,#5B3A8C,#B84E0A) 1;
+  padding:9px 40px 8px;display:flex;align-items:center;justify-content:space-between;gap:14px;
 }
-.page-footer-text{font-size:7pt;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
-.page-num{font-size:7pt;color:var(--muted);font-family:var(--mono)}
+.page-footer-left{display:flex;align-items:center;gap:9px;min-width:0}
+.page-footer-brand{font-size:7.5pt;font-weight:800;color:var(--navy);white-space:nowrap;flex-shrink:0}
+.page-footer-sep{width:1px;height:11px;background:var(--border);flex-shrink:0}
+.page-footer-text{font-size:7pt;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-num{font-size:7pt;color:var(--muted);font-family:var(--mono);flex-shrink:0}
 
 /* SECTION HEADERS */
 .sec-header{
@@ -374,6 +377,21 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
   padding:12px 14px;font-size:9.5pt;color:var(--body);line-height:1.6;min-height:40px;
 }
+/* Module-tinted feedback cards — ties Overall Feedback back to the module cards' colours */
+.narrative-block.mod-feedback-card{
+  border-radius:var(--r);border:1px solid var(--border);border-left:3px solid var(--mc,var(--navy));
+  padding:14px 16px;background:linear-gradient(90deg,color-mix(in srgb,var(--mc,var(--navy)) 6%,#fff),#fff 55%);
+  margin-bottom:14px;
+}
+.narrative-block.mod-feedback-card .narrative-label{color:var(--mc,var(--navy))!important;margin-bottom:7px}
+.narrative-block.mod-feedback-card .narrative-label::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--mc,var(--navy));flex-shrink:0}
+.narrative-block.mod-feedback-card .narrative-label::after{display:none}
+.narrative-block.mod-feedback-card .narrative-label .lbl-sub{color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0}
+.narrative-block.mod-feedback-card .nar-wrap{display:flex;flex-direction:column}
+.narrative-block.mod-feedback-card .narrative-textarea{border-color:transparent;background:transparent;padding-left:0;padding-right:0;min-height:44px!important}
+.narrative-block.mod-feedback-card .narrative-textarea:hover,.narrative-block.mod-feedback-card .narrative-textarea:focus{background:#fff;border-color:var(--border);padding-left:14px;padding-right:14px;box-shadow:none}
+.narrative-block.mod-feedback-card .draft-btn{align-self:flex-end;padding:4px 11px;font-size:7.5pt;font-weight:700;color:var(--mc,var(--navy));background:color-mix(in srgb,var(--mc,var(--navy)) 10%,#fff);border:none}
+.narrative-block.mod-feedback-card .nar-print{padding:2px 0 0}
 
 /* DUAL RENDER — screen shows textarea/select, print shows plain div/span */
 .nar-wrap{position:relative;margin-bottom:20px}
@@ -962,6 +980,15 @@ body.compact-density .progress-bar-wrap{height:6px}
   font-size:8.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
   color:rgba(255,255,255,.4);margin-bottom:12px;
 }
+.dash-chart-donut-wrap{position:relative}
+.dash-donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.dash-donut-center .n{font-size:19px;font-weight:800;color:#fff;line-height:1}
+.dash-donut-center .l{font-size:6.5pt;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.dash-legend-row{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;row-gap:4px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.dash-legend-item{display:flex;align-items:center;gap:6px;font-size:7.5pt;color:rgba(255,255,255,.6);padding:2px 0;justify-content:space-between}
+.dash-legend-item .lbl-wrap{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-legend-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dash-legend-item b{color:#fff;font-weight:700;flex-shrink:0;margin-left:8px}
 .dash-prog-table{width:100%;border-collapse:collapse;font-size:8.5pt}
 .dash-prog-table th{
   font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
@@ -2261,13 +2288,18 @@ body.compact-density .progress-bar-wrap{height:6px}
     <div class="dash-section-title" style="margin-bottom:16px">Cohort Analytics</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
       <div>
-        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px">Progress Distribution</div>
-        <div style="position:relative;height:180px"><canvas id="dash-chart-dist"></canvas></div>
+        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <span>Progress Distribution</span><span id="dash-dist-total" style="color:rgba(255,255,255,.25);font-weight:600;letter-spacing:0;text-transform:none;font-size:8pt"></span>
+        </div>
+        <div style="position:relative;height:180px;padding-top:16px"><canvas id="dash-chart-dist"></canvas></div>
       </div>
       <div>
-        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px">Satisfactory vs Remediation vs No Data (by WM Milestone)</div>
-        <div style="position:relative;height:180px"><canvas id="dash-chart-donut"></canvas></div>
-        <div id="dash-donut-legend" style="display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:8pt;color:rgba(255,255,255,.6)"></div>
+        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px">Satisfactory vs Remediation (by WM Milestone)</div>
+        <div class="dash-chart-donut-wrap" style="position:relative;height:180px">
+          <canvas id="dash-chart-donut"></canvas>
+          <div class="dash-donut-center" id="dash-donut-center"><div class="n">0</div><div class="l">Satisfactory</div></div>
+        </div>
+        <div id="dash-donut-legend" class="dash-legend-row"></div>
       </div>
       <div>
         <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px">Cohort Avg % — 12 Month Trend</div>
@@ -4003,7 +4035,11 @@ function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML){
     </div>
     <div class="page-body">${bodyHTML}</div>
     <div class="page-footer">
-      <span class="page-footer-text">Confidential — For authorised recipient only</span>
+      <div class="page-footer-left">
+        <span class="page-footer-brand">${esc(clientName)}</span>
+        <span class="page-footer-sep"></span>
+        <span class="page-footer-text">Confidential — For authorised recipient only</span>
+      </div>
       <span class="page-num">${pageNum} / ${TOTAL_PAGES}</span>
     </div>`;
   return div;
@@ -4344,7 +4380,11 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
       </div>
     </div>
     <div class="page-footer">
-      <span class="page-footer-text">Confidential — For authorised recipient only</span>
+      <div class="page-footer-left">
+        <span class="page-footer-brand">${esc(client.client_name)}</span>
+        <span class="page-footer-sep"></span>
+        <span class="page-footer-text">Confidential — For authorised recipient only</span>
+      </div>
       <span class="page-num">${pn} / ${TOTAL_PAGES}</span>
     </div>`;
   return div;
@@ -4602,9 +4642,9 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
   ['Module 1','Module 2','Module 3','Module 4'].forEach((m,i)=>{
     const key=`feedback_m${i+1}`;
     const modCls=['m1','m2','m3','m4'][i];
-    body+=`<div class="narrative-block">
-      <div class="narrative-label" style="color:var(--${modCls})">${m} — Submissions &amp; Competencies</div>
-      ${narField(key,`Describe submission status, assessor progress, exam results for ${m}…`,nar[key],'64px')}
+    body+=`<div class="narrative-block mod-feedback-card" style="--mc:var(--${modCls})">
+      <div class="narrative-label">${m} <span class="lbl-sub">Submissions &amp; Competencies</span></div>
+      ${narField(key,`Describe submission status, assessor progress, exam results for ${m}…`,nar[key],'44px')}
     </div>`;
   });
 
@@ -9170,6 +9210,19 @@ function toggleReportDensity(){
 
 // ── Dashboard Charts ──
 let _dashChartDist=null,_dashChartDonut=null,_dashChartTrend=null;
+const _dashBarLabelPlugin={id:'dashBarLabel',afterDatasetsDraw(chart){
+  const ctx=chart.ctx;
+  chart.data.datasets[0].data.forEach((v,i)=>{
+    const meta=chart.getDatasetMeta(0).data[i];
+    if(!meta)return;
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,.85)';
+    ctx.font="700 10px 'DM Sans', sans-serif";
+    ctx.textAlign='center';
+    ctx.fillText(v,meta.x,meta.y-6);
+    ctx.restore();
+  });
+}};
 function renderDashCharts(eisaRows,attRows,programmes){
   // Build progress buckets from eisa data (km/pm/wm completions as proxy)
   const buckets={'0%':0,'KM':0,'PM':0,'WM':0,'Comp':0};
@@ -9200,12 +9253,16 @@ function renderDashCharts(eisaRows,attRows,programmes){
   const ctxT=document.getElementById('dash-chart-trend');
   if(!ctxB||!ctxD||!ctxT)return;
   const chartDefaults={color:'rgba(255,255,255,.55)',borderColor:'rgba(255,255,255,.08)'};
+  const distTotalEl=document.getElementById('dash-dist-total');
+  if(distTotalEl)distTotalEl.textContent=`${progIds.length} programme${progIds.length===1?'':'s'}`;
   if(_dashChartDist)_dashChartDist.destroy();
-  _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','KM','PM','WM','Comp'],datasets:[{label:'Programmes',data:[buckets['0%'],buckets['KM'],buckets['PM'],buckets['WM'],buckets['Comp']],backgroundColor:['#4b5563','#f59e0b','#f59e0b','#10b981','#10b981'],borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{stepSize:1,color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}}});
+  _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','KM','PM','WM','Comp'],datasets:[{label:'Programmes',data:[buckets['0%'],buckets['KM'],buckets['PM'],buckets['WM'],buckets['Comp']],backgroundColor:['#64748b','#fab219','#fab219','#fab219','#22c55e'],borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:false}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
   if(_dashChartDonut)_dashChartDonut.destroy();
-  _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','Remediation','No Data'],datasets:[{data:[satWM,satPM,rem,noData],backgroundColor:['#10b981','#34d399','#f59e0b','#6b7280'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+  _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','Remediation','No Data'],datasets:[{data:[satWM,satPM,rem||0.0001,noData],backgroundColor:['#22c55e','#166534','#fab219','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
+  const donutCenterEl=document.getElementById('dash-donut-center');
+  if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${sat}</div><div class="l">Satisfactory</div>`;
   const legendEl=document.getElementById('dash-donut-legend');
-  if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',satWM,'#10b981'],['Satisfactory (PM)',satPM,'#34d399'],['Remediation',rem,'#f59e0b'],['No Data',noData,'#6b7280']].map(([l,n,c])=>`<span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:2px;background:${c};flex-shrink:0"></span>${l}: <strong style="color:#fff">${n}</strong> (${Math.round(n/total*100)}%)</span>`).join('');
+  if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',satWM,'#22c55e'],['Satisfactory (PM)',satPM,'#166534'],['Remediation',rem,'#fab219'],['No Data',noData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
   // Trend: monthly att rate as proxy for cohort progress over time
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const attByMonth={};
@@ -9228,7 +9285,8 @@ function renderDashCharts(eisaRows,attRows,programmes){
   }else{
     const trendLabels=months.slice(firstIdx,lastIdx+1);
     const trendData=trendDataFull.slice(firstIdx,lastIdx+1);
-    _dashChartTrend=new Chart(ctxT,{type:'line',data:{labels:trendLabels,datasets:[{label:'Att %',data:trendData,borderColor:'#D4A017',backgroundColor:'rgba(212,160,23,0.08)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#E03E15',tension:0.35,fill:true,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y===null?'No data':ctx.parsed.y+'%'}}},scales:{y:{min:0,max:100,ticks:{stepSize:20,callback:v=>v+'%',color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}}});
+    const lastFilledIdx=trendData.length-1-[...trendData].reverse().findIndex(v=>v!==null);
+    _dashChartTrend=new Chart(ctxT,{type:'line',data:{labels:trendLabels,datasets:[{label:'Att %',data:trendData,borderColor:'#D4A017',backgroundColor:'rgba(212,160,23,0.1)',borderWidth:2.5,pointRadius:(ctx)=>ctx.dataIndex===lastFilledIdx?5:0,pointBackgroundColor:'#D4A017',pointBorderColor:'#131e35',pointBorderWidth:2,tension:0.35,fill:true,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y===null?'No data':ctx.parsed.y+'%'}}},scales:{y:{min:0,max:100,ticks:{stepSize:50,callback:v=>v+'%',color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}}});
   }
 }
 
