@@ -4583,7 +4583,8 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     // inline --mc custom property (set below) always overrides the CSS fallback colour.
     const fieldMap=moduleFieldMap(modNums);
     return{cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
-      qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null};
+      qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null,
+      applies:legacy?null:moduleAppliesTypes(prog,n)};
   });
   let body=`
     <div class="sec-header"><div class="sec-accent" style="background:${p.accentFrom}"></div>
@@ -4617,7 +4618,14 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
       };
       let progressHtml='';
       if(m.qp&&m.qp.total>0){
-        progressHtml=`<div class="mod-formsum-wrap">${bar('KM',m.qp.km,m.qp.total)}${bar('PM',m.qp.pm,m.qp.total)}${bar('WM',m.qp.wm,m.qp.total)}</div>`;
+        // Only show a KM/PM/WM bar for the types this module's registered unit
+        // standards actually carry (moduleAppliesTypes) — a KM-only module (e.g.
+        // Module 1 with just KM01/KM02) was previously always showing PM 0/x and
+        // WM 0/x bars too, reading as "not yet done" for sub-types that were never
+        // required in the first place and don't have their own assessment columns
+        // on the Assessment page below (which already filters correctly).
+        const ap=m.applies||{km:true,pm:true,wm:true};
+        progressHtml=`<div class="mod-formsum-wrap">${ap.km?bar('KM',m.qp.km,m.qp.total):''}${ap.pm?bar('PM',m.qp.pm,m.qp.total):''}${ap.wm?bar('WM',m.qp.wm,m.qp.total):''}</div>`;
       } else if(m.lp&&m.lp.total>0){
         progressHtml=`<div class="mod-formsum-wrap">${bar('Form',m.lp.fDone,m.lp.total)}${bar('Sum',m.lp.sDone,m.lp.total)}</div>`;
       }
