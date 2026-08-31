@@ -676,9 +676,9 @@
                 <li class="nav-item" data-view="poe" data-roles="admin,etqa,qa_specialist,project_manager,demo" onclick="switchTab('poe')"><span class="nav-icon">&#9776;</span>PoE Checklist</li>
                 <li class="nav-item" data-view="assessors" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('assessors')"><span class="nav-icon">&#127891;</span>Assessors &amp; Mods</li>
                 <li class="nav-item" data-view="recommendations" data-roles="admin,qa_specialist,project_manager,demo" onclick="switchTab('recommendations')"><span class="nav-icon">&#10003;</span>Recommendations</li>
-                <li class="nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')"><span class="nav-icon">&#9633;</span>Reports &amp; Analytics</li>
-                <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')"><span class="nav-icon">&#128196;</span>Report Generator</li>
-                <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')"><span class="nav-icon">&#128279;</span>QCTO / SETA Links</li>
+                <li class="nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')" title="Compliance summary, PDF report and CSV exports — stays inside ApexOne."><span class="nav-icon">&#9633;</span>Reports &amp; Analytics</li>
+                <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')" title="Opens the separate Client Report Generator tool in this tab. It has its own 'Back to Hub' link to return."><span class="nav-icon">&#128196;</span>Report Generator <span style="opacity:.55;font-size:.85em;" aria-hidden="true">&#8599;</span></li>
+                <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')" title="Opens the QCTO/SETA directory as a separate page. Use its 'Back to Hub' link to return."><span class="nav-icon">&#128279;</span>QCTO / SETA Links <span style="opacity:.55;font-size:.85em;" aria-hidden="true">&#8599;</span></li>
                 <li class="nav-item" data-view="users" data-roles="admin" onclick="switchTab('users')"><span class="nav-icon">&#128101;</span>User Management</li>
                 <li class="nav-item" data-view="audit" data-roles="admin,head_of_ops,demo" onclick="switchTab('audit')"><span class="nav-icon">&#128203;</span>Audit Log</li>
             </ul>
@@ -748,8 +748,8 @@
             <div class="mobile-nav-item" data-view="assessors" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('assessors')">Assessors</div>
             <div class="mobile-nav-item" data-view="recommendations" data-roles="admin,qa_specialist,project_manager,demo" onclick="switchTab('recommendations')">Recommendations</div>
             <div class="mobile-nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')">Reports</div>
-            <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')">Report Gen</div>
-            <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')">QCTO/SETA Links</div>
+            <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')">Report Generator &#8599;</div>
+            <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')">QCTO/SETA Links &#8599;</div>
             <div class="mobile-nav-item" data-view="users" data-roles="admin" onclick="switchTab('users')">Users</div>
         </div>
 
