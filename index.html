@@ -2037,40 +2037,112 @@ async function doForgotVerify() {
 }
 
 // ── USER MANAGEMENT ───────────────────────────────────────────────────
-function renderUserList() {
+// Real in-app editor, backed by the `user-admin` Supabase Edge Function
+// (deployed 2026-08-31). The function holds the service-role key server-side
+// (never sent to the browser) and re-checks that the caller's own role is
+// 'admin' before touching Supabase Auth — this page just calls it.
+const USER_ROLE_OPTIONS = ['admin','qa_specialist','etqa','project_manager','operations','head_of_ops','pi_specialist','demo'];
+
+async function callUserAdmin(action, payload) {
+    const { data, error } = await supabase.functions.invoke('user-admin', { body: { action, ...payload } });
+    if (error) {
+        // Edge Function errors (4xx/5xx) surface here without the JSON body by default;
+        // try to recover the real message from the error context if present.
+        let msg = error.message || 'Request failed';
+        try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch(_) {}
+        throw new Error(msg);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
+}
+
+async function renderUserList() {
     const container = document.getElementById('user-list-container');
     if (!container) return;
-    container.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px;line-height:1.6;">
-        User accounts are managed in the Supabase dashboard now, not here.<br><br>
-        To add or edit a user: <strong>Supabase Dashboard → Authentication → Users</strong> →
-        Invite (or select an existing user) → set <strong>Raw App Meta Data</strong> to e.g.
-        <code style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;">{"role":"project_manager","name":"Thabo N","tenant":"apex-academy"}</code>.
-        For users with two roles, use an array: <code style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;">{"role":["project_manager","etqa"],...}</code>.<br><br>
-        Use <em>Raw App Meta Data</em>, not <em>Raw User Meta Data</em> — the latter can be edited by the user themselves and isn't trusted for role checks.<br><br>
-        <button class="btn btn-secondary btn-sm" onclick="copyAuthTemplate()">&#128203; Copy JSON template</button>
-        <a href="https://supabase.com/dashboard/project/nducwhlmudksgxggjrbo/auth/users" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;">&#8599; Open Supabase → Users</a>
-    </div>`;
+    container.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px;">Loading users…</div>`;
+    try {
+        const { users } = await callUserAdmin('list', {});
+        const roleOpts = r => USER_ROLE_OPTIONS.map(o => `<option value="${o}"${o===r?' selected':''}>${o}</option>`).join('');
+        container.innerHTML = `
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Tenant</th><th>Last Sign-in</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        ${users.map(u => `
+                        <tr data-user-id="${u.id}">
+                            <td>${escapeHtml(u.email||'')}</td>
+                            <td><input type="text" class="filter-input" data-field="name" value="${escapeHtml(u.name||'')}" style="width:140px;"></td>
+                            <td><select class="filter-select" data-field="role">${roleOpts(u.role)}</select></td>
+                            <td><input type="text" class="filter-input" data-field="tenant" value="${escapeHtml(u.tenant||'')}" style="width:120px;"></td>
+                            <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-ZA') : '<span class="blank-cell">never</span>'}</td>
+                            <td>
+                                <button class="btn btn-gold btn-sm" onclick="saveUserRow('${u.id}')">Save</button>
+                                <button class="btn btn-secondary btn-sm" onclick="deleteUserRow('${u.id}','${escapeHtml(u.email||'')}')">Remove</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div style="padding:10px 4px;font-size:11px;color:var(--text-muted);">
+                ${users.length} user${users.length===1?'':'s'}. Role changes take effect next time that user signs in or refreshes.
+            </div>`;
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<div style="padding:16px;color:var(--accent-rose);font-size:13px;">
+            Couldn't load users: ${escapeHtml(e.message||String(e))}<br><br>
+            <a href="https://supabase.com/dashboard/project/nducwhlmudksgxggjrbo/auth/users" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;">&#8599; Open Supabase → Users instead</a>
+        </div>`;
+    }
 }
-// The gold "+ Add User" button used to just pop a toast that repeated
-// instructions already on this page — a dead-looking primary CTA. It now
-// does the two things an admin actually needs: copies the Raw App Meta Data
-// JSON template to the clipboard and opens the Supabase Auth Users page,
-// so the admin can paste straight into the "Raw App Meta Data" field.
+
+async function saveUserRow(userId) {
+    const tr = document.querySelector(`#user-list-container tr[data-user-id="${userId}"]`);
+    if (!tr) return;
+    const role = tr.querySelector('[data-field="role"]').value;
+    const name = tr.querySelector('[data-field="name"]').value.trim();
+    const tenant = tr.querySelector('[data-field="tenant"]').value.trim();
+    try {
+        await callUserAdmin('update', { user_id: userId, role, name, tenant });
+        showToast('success', 'User updated.');
+    } catch (e) {
+        showToast('error', 'Failed to update user: ' + (e.message||e));
+    }
+}
+
+async function deleteUserRow(userId, email) {
+    if (!confirm(`Remove ${email || 'this user'}'s access to ApexOne? They will no longer be able to sign in.`)) return;
+    try {
+        await callUserAdmin('delete', { user_id: userId });
+        showToast('success', 'User removed.');
+        renderUserList();
+    } catch (e) {
+        showToast('error', 'Failed to remove user: ' + (e.message||e));
+    }
+}
+
 function openAddUserModal() {
-    copyAuthTemplate();
-    window.open('https://supabase.com/dashboard/project/nducwhlmudksgxggjrbo/auth/users', '_blank', 'noopener');
+    const email = prompt('Email address to invite:');
+    if (!email) return;
+    const role = prompt(`Role (one of: ${USER_ROLE_OPTIONS.join(', ')}):`, 'project_manager');
+    if (!role || !USER_ROLE_OPTIONS.includes(role)) { showToast('error', 'Invite cancelled — role must be one of: ' + USER_ROLE_OPTIONS.join(', ')); return; }
+    const name = prompt('Display name (optional):', '') || '';
+    (async () => {
+        try {
+            await callUserAdmin('invite', { email, role, name, tenant: 'apex-academy' });
+            showToast('success', `Invite sent to ${email}.`);
+            renderUserList();
+        } catch (e) {
+            showToast('error', 'Failed to invite user: ' + (e.message||e));
+        }
+    })();
 }
 function copyAuthTemplate() {
     const template = '{"role":"project_manager","name":"Full Name","tenant":"apex-academy"}';
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(template)
-            .then(() => showToast('success', 'Template copied — paste into Raw App Meta Data in the Supabase dashboard.'))
-            .catch(() => showToast('info', 'Copy this into Raw App Meta Data: ' + template));
-    } else {
-        showToast('info', 'Copy this into Raw App Meta Data: ' + template);
+        navigator.clipboard.writeText(template).then(() => showToast('success', 'Template copied.'));
     }
 }
-function saveUserModal() { /* no-op — form removed, see renderUserList() */ }
+function saveUserModal() { /* no-op — legacy hook, kept for any lingering callers */ }
 
 // ── CHANGE OWN PASSWORD ───────────────────────────────────────────────
 function openChangePasswordModal() {
