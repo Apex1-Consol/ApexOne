@@ -2845,9 +2845,14 @@ function blankCellLabel(val, fallback) {
 // never hides or deletes anything, just adds a small "TEST" badge next to the name.
 // False positives are possible for a genuinely-named "Test Test" client; that's an
 // acceptable tradeoff for a visibility aid, not a filter.
-const SEED_DATA_PATTERN = /\b(test|demo|xyz|sta sta)\b/i;
+const SEED_DATA_PATTERN = /\b(test|demo|xyz)\b/i;
 function isLikelySeedRecord(...names) {
-    return names.some(n => n && SEED_DATA_PATTERN.test(String(n)));
+    const parts = names.filter(Boolean).map(String);
+    if (parts.some(n => SEED_DATA_PATTERN.test(n))) return true;
+    // Identical first/last name (e.g. "sta sta") is another repeated-seed-script
+    // signature that a per-field keyword test wouldn't catch on its own.
+    if (parts.length === 2 && parts[0].trim().toLowerCase() === parts[1].trim().toLowerCase()) return true;
+    return false;
 }
 function testBadge(...names) {
     return isLikelySeedRecord(...names)
