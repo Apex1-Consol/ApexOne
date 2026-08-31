@@ -13,12 +13,12 @@
 <style>
 :root{
   --navy:#1A365D;--navy2:#2D4A7A;--navy3:#10223B;
-  --red:#E03E15;--red2:#C2320E;--red-bg:#FFF0ED;
+  --red:#E03E15;--red2:#C2320E;--red-bg:rgba(224,62,21,0.14);
   --gold:#D4A017;--gold2:#F0C040;
-  --success:#1B7A4A;--success-bg:#EDFBF3;
-  --grey:#A0AEC0;--grey-bg:#EDF1F7;
-  --muted:#718096;--body:#4A5568;--dark:#1E2533;
-  --border:#DEE5EF;--surface:#F8FAFC;--white:#FFFFFF;
+  --success:#1B7A4A;--success-bg:rgba(27,122,74,0.16);
+  --grey:#A0AEC0;--grey-bg:#0A2440;
+  --muted:#7D92AB;--body:#B7C7DA;--dark:#F7F4EC;
+  --border:rgba(212,165,55,0.22);--surface:#0C2F52;--white:#123458;
   --font:'DM Sans',system-ui,sans-serif;
   --mono:'DM Mono',monospace;
   --r:8px;--r2:12px;
@@ -39,7 +39,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .topbar-actions{display:flex;gap:10px;align-items:center}
 .overall-badge{font-family:var(--mono);font-size:9pt;color:#fff;background:rgba(255,255,255,.1);padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.2)}
 
-.btn{padding:9px 16px;border-radius:var(--r);font-weight:700;font-size:9.5pt;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--body);display:inline-flex;align-items:center;gap:6px}
+.btn{padding:9px 16px;border-radius:var(--r);font-weight:700;font-size:9.5pt;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--body);display:inline-flex;align-items:center;gap:6px}
 .btn:hover{background:var(--surface)}
 .btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
 .btn.primary:hover{background:var(--navy2)}
@@ -52,9 +52,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 #dashboard{padding:28px 32px}
 .dash-controls{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
 .dash-controls input[type=text]{flex:1;min-width:200px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt}
-.dash-controls select{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt;background:#fff}
+.dash-controls select{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-family:var(--font);font-size:10pt;background:var(--white)}
 #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
+.card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r2);padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:.15s}
 .card:hover{border-color:var(--navy2);box-shadow:var(--shadow2)}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .card-title{font-weight:800;color:var(--navy);font-size:11.5pt}
@@ -95,7 +95,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .field label .req{color:var(--red);margin-left:2px}
 .field input,.field select,.field textarea{
   width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--r);
-  font-family:var(--font);font-size:10.5pt;color:var(--dark);background:#fff;transition:.15s;
+  font-family:var(--font);font-size:10.5pt;color:var(--dark);background:var(--white);transition:.15s;
 }
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--navy2);box-shadow:0 0 0 3px rgba(45,74,122,.12)}
 .field input.filled,.field select.filled{border-color:var(--success);background:var(--success-bg)}
@@ -110,7 +110,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .notes-box{margin-top:24px;padding-top:18px;border-top:1px dashed var(--border)}
 .notes-box label{display:block;font-size:9.5pt;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
 
-#nav{display:flex;justify-content:space-between;padding:18px 32px;border-top:1px solid var(--border);background:#fff;flex-wrap:wrap;gap:10px}
+#nav{display:flex;justify-content:space-between;padding:18px 32px;border-top:1px solid var(--border);background:var(--white);flex-wrap:wrap;gap:10px}
 #summary{background:var(--gold2);color:var(--navy3);padding:10px 32px;font-size:9pt;font-weight:700;text-align:center;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--navy3);color:#fff;padding:10px 18px;border-radius:var(--r);font-size:9pt;font-weight:600;box-shadow:var(--shadow2);opacity:0;transition:.25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}
@@ -120,12 +120,12 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 @media(max-width:640px){.rollout-head-grid{grid-template-columns:1fr}}
 .rollout-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding:14px;background:var(--grey-bg);border-radius:var(--r)}
 .rollout-toolbar .hint{font-size:8.5pt;color:var(--muted);flex:1;min-width:180px}
-.module-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:18px;overflow:hidden}
+.module-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:18px;overflow:hidden}
 .module-card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--navy);color:#fff}
 .module-card-head input{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 10px;border-radius:6px;font-family:var(--font);font-weight:700;font-size:10pt}
 .module-card-head input::placeholder{color:rgba(255,255,255,.5)}
 .module-progress{font-family:var(--mono);font-size:8.5pt;color:#fff;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:12px;white-space:nowrap}
-select.status-select{border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-family:var(--font);font-size:8pt;font-weight:700;background:#fff;width:100%}
+select.status-select{border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-family:var(--font);font-size:8pt;font-weight:700;background:var(--white);width:100%}
 .module-credit{font-family:var(--mono);font-size:8.5pt;background:rgba(255,255,255,.12);padding:5px 10px;border-radius:12px;white-space:nowrap}
 .subject-table-wrap{overflow-x:auto}
 table.subject-table{border-collapse:collapse;width:100%;min-width:1150px}
@@ -135,7 +135,7 @@ table.subject-table input{width:100%;min-width:90px;padding:6px 7px;border:1px s
 table.subject-table input.wide{min-width:150px}
 table.subject-table input.narrow{min-width:55px}
 .module-card-foot{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--surface)}
-.rollout-final{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:16px;margin-top:8px}
+.rollout-final{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r2);padding:16px;margin-top:8px}
 .rollout-final h3{font-size:10pt;color:var(--navy);margin-bottom:12px;text-transform:uppercase;letter-spacing:.03em}
 .rollout-final .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 @media(max-width:640px){.rollout-final .grid3{grid-template-columns:1fr}}
@@ -224,13 +224,13 @@ table.subject-table input.narrow{min-width:55px}
 <div id="authGate" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0B1220;font-family:'DM Sans',system-ui,sans-serif;">
   <div style="background:#F8FAFC;border-radius:12px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.3);">
     <h1 style="font-size:15pt;font-weight:800;color:#1A365D;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px;">ApexU</h1>
-    <p style="font-size:9pt;color:#718096;margin-bottom:22px;">Sign in to Programme Initiation</p>
+    <p style="font-size:9pt;color:var(--body);margin-bottom:22px;">Sign in to Programme Initiation</p>
     <div style="margin-bottom:14px;">
-      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">Email</label>
+      <label style="display:block;font-size:9pt;font-weight:700;color:var(--body);margin-bottom:6px;text-transform:uppercase;">Email</label>
       <input type="email" id="authEmail" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="username">
     </div>
     <div style="margin-bottom:18px;">
-      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">Password</label>
+      <label style="display:block;font-size:9pt;font-weight:700;color:var(--body);margin-bottom:6px;text-transform:uppercase;">Password</label>
       <input type="password" id="authPassword" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="current-password">
     </div>
     <div id="authError" style="display:none;color:#C2320E;font-size:8.5pt;margin-bottom:14px;"></div>
@@ -240,9 +240,9 @@ table.subject-table input.narrow{min-width:55px}
   </div>
   <div id="authResetGate" style="display:none;background:#F8FAFC;border-radius:12px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.3);">
     <h1 style="font-size:15pt;font-weight:800;color:#1A365D;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px;">ApexU</h1>
-    <p style="font-size:9pt;color:#718096;margin-bottom:22px;">Set a new password</p>
+    <p style="font-size:9pt;color:var(--body);margin-bottom:22px;">Set a new password</p>
     <div style="margin-bottom:18px;">
-      <label style="display:block;font-size:9pt;font-weight:700;color:#4A5568;margin-bottom:6px;text-transform:uppercase;">New password</label>
+      <label style="display:block;font-size:9pt;font-weight:700;color:var(--body);margin-bottom:6px;text-transform:uppercase;">New password</label>
       <input type="password" id="authNewPassword" style="width:100%;padding:11px 14px;border:1.5px solid #DEE5EF;border-radius:8px;font-size:10.5pt;" autocomplete="new-password">
     </div>
     <div id="authResetError" style="display:none;color:#C2320E;font-size:8.5pt;margin-bottom:14px;"></div>
@@ -317,7 +317,7 @@ table.subject-table input.narrow{min-width:55px}
       </div>
     </div>
     <div class="modal-box-body" style="padding:16px">
-      <iframe id="rolloutPreviewFrame" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:var(--r);background:#fff"></iframe>
+      <iframe id="rolloutPreviewFrame" style="width:100%;height:75vh;border:1px solid var(--border);border-radius:var(--r);background:var(--white)"></iframe>
     </div>
   </div>
 </div>
