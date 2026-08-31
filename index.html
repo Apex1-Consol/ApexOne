@@ -247,6 +247,7 @@
         .sticky-col .data-table th:first-child{z-index:15;}
         .sticky-col .data-table tr:hover td:first-child{background:var(--bg-card-hover);}
         .blank-cell{color:var(--text-muted);font-style:italic;opacity:0.75;}
+        .seed-data-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.5px;color:var(--accent-gold);border:1px solid rgba(250,178,25,0.5);border-radius:3px;padding:1px 4px;margin-left:5px;vertical-align:middle;}
         .filter-bar{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
         .filter-group{display:flex;flex-direction:column;gap:4px;}
         .filter-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:600;}
@@ -887,7 +888,7 @@
                     </div>
                     <div class="table-wrapper sticky-col">
                         <table class="data-table" id="table-programmes">
-                            <thead><tr><th>Prog ID</th><th>Stage</th><th>Entity</th><th>Project Manager</th><th>Client</th><th>Type</th><th>Qualification</th><th>SAQA ID</th><th>NQF</th><th>Learners</th><th>Status</th><th>Accreditation End</th><th>EISA Start</th><th>EISA End</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Prog ID</th><th>Stage</th><th>Entity</th><th>Project Manager</th><th>Client</th><th>Type</th><th>Qualification</th><th title="SAQA ID — the South African Qualifications Authority's unique ID number for this qualification.">SAQA ID</th><th title="NQF — National Qualifications Framework level (1–10), South Africa's scale for how advanced a qualification is.">NQF</th><th>Learners</th><th>Status</th><th>Accreditation End</th><th title="EISA — External Integrated Summative Assessment. The final QCTO-set exam/assessment for occupational qualifications.">EISA Start</th><th title="EISA — External Integrated Summative Assessment. The final QCTO-set exam/assessment for occupational qualifications.">EISA End</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-programmes"></tbody>
                         </table>
                     </div>
@@ -954,7 +955,7 @@
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table" id="table-eisa">
-                            <thead><tr><th>Learner</th><th>Programme</th><th>Module</th><th>KM</th><th>PM</th><th>WM</th><th>Exam V1</th><th>Exam V2</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Learner</th><th>Programme</th><th>Module</th><th title="KM — Knowledge Module. Theory/knowledge component of a QCTO occupational qualification.">KM</th><th title="PM — Practical Module. Practical skills component of a QCTO occupational qualification.">PM</th><th title="WM — Workplace Module. Workplace-experience component of a QCTO occupational qualification.">WM</th><th title="First attempt at the EISA exam (C = Competent, NYC = Not Yet Competent).">Exam V1</th><th title="Second attempt at the EISA exam, if the first attempt was Not Yet Competent.">Exam V2</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-eisa"></tbody>
                         </table>
                     </div>
@@ -2767,6 +2768,20 @@ function blankCellLabel(val, fallback) {
     const v = (val ?? '').toString().trim();
     return v ? escapeHtml(v) : `<span class="blank-cell">${escapeHtml(fallback)}</span>`;
 }
+// Flags records that look like seed/test data by name, so a first-time user can tell
+// them apart from real records at a glance. Heuristic only, driven by naming convention —
+// never hides or deletes anything, just adds a small "TEST" badge next to the name.
+// False positives are possible for a genuinely-named "Test Test" client; that's an
+// acceptable tradeoff for a visibility aid, not a filter.
+const SEED_DATA_PATTERN = /\b(test|demo|xyz|sta sta)\b/i;
+function isLikelySeedRecord(...names) {
+    return names.some(n => n && SEED_DATA_PATTERN.test(String(n)));
+}
+function testBadge(...names) {
+    return isLikelySeedRecord(...names)
+        ? ' <span class="seed-data-badge" title="Name matches a common test/seed-data pattern (test, demo, xyz). Flagged for visibility only — nothing is hidden or changed.">TEST</span>'
+        : '';
+}
 function numOrNull(val) {
     if (val === '' || val === null || val === undefined) return null;
     const n = Number(val);
@@ -3367,7 +3382,7 @@ function renderLearnersTable(resetPage) {
         tr.innerHTML = `
             <td data-label="Learner ID">${escapeHtml(f['Learner ID']||String(r.id).slice(-6))}${(!f['First Name'] && !f['Last Name']) ? ' <span class="blank-cell" title="No name on this record">&#9888; unnamed</span>' : ''}</td>
             <td data-label="National ID">${escapeHtml(f['National ID']||'')}</td>
-            <td data-label="First Name">${escapeHtml(f['First Name']||'')}</td>
+            <td data-label="First Name">${escapeHtml(f['First Name']||'')}${testBadge(f['First Name'], f['Last Name'])}</td>
             <td data-label="Last Name">${escapeHtml(f['Last Name']||'')}</td>
             <td data-label="DOB">${escapeHtml(f['DOB']||'')}</td>
             <td data-label="Gender">${escapeHtml(f['Gender']||'')}</td>
@@ -3489,7 +3504,7 @@ async function loadMonitoring() {
                 <td data-label="Visit ID">${escapeHtml(f['Visit ID']||String(r.id).slice(-6))}</td>
                 <td data-label="Programme">${escapeHtml(prog)}</td>
                 <td data-label="Date">${escapeHtml(f['Date of Visit']||'')}</td>
-                <td data-label="Venue">${escapeHtml(f['Venue']||'')}</td>
+                <td data-label="Venue">${escapeHtml(f['Venue']||'')}${testBadge(f['Venue'])}</td>
                 <td data-label="KMA1">${escapeHtml(f['KMA1']||'—')}</td>
                 <td data-label="KMA2">${escapeHtml(f['KMA2']||'—')}</td>
                 <td data-label="KMA3">${escapeHtml(f['KMA3']||'—')}</td>
@@ -4900,7 +4915,7 @@ async function loadClients() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-record-id', r.id);
             tr.innerHTML = `
-                <td><strong>${blankCellLabel(f['Company Name'], '— Unnamed client —')}</strong></td>
+                <td><strong>${blankCellLabel(f['Company Name'], '— Unnamed client —')}${testBadge(f['Company Name'])}</strong></td>
                 <td>${escapeHtml(f['Contact Person']||'')}</td>
                 <td>${escapeHtml(f['Email']||'')}</td>
                 <td>${escapeHtml(f['Phone']||'')}</td>
@@ -5032,7 +5047,7 @@ async function loadAssessors() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-record-id', r.id);
             tr.innerHTML = `
-                <td data-label="Name"><strong>${escapeHtml(f['Full Name']||'')}</strong></td>
+                <td data-label="Name"><strong>${escapeHtml(f['Full Name']||'')}${testBadge(f['Full Name'])}</strong></td>
                 <td data-label="ID Number">${escapeHtml(f['ID Number']||'')}</td>
                 <td data-label="Role">${escapeHtml(f['Role']||'')}</td>
                 <td data-label="Reg Number">${escapeHtml(f['Registration Number']||'')}</td>
