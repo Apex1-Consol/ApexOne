@@ -3274,6 +3274,19 @@ function moduleFieldMap(nums){
   (nums||DEFAULT_MODULE_NUMS).forEach(n=>{map[n]=`module_${n}_dates`;});
   return map;
 }
+// ── Modules a programme genuinely doesn't run ──
+// A programme's `excluded_modules` column (jsonb array of module numbers,
+// e.g. [4]) lets a PM say "this programme only actually runs 3 modules" (or
+// "Module 4 hasn't started and won't for a while") so the Report Generator
+// stops permanently requiring a date/narrative for a module that was never
+// going to happen. Set via the "Not part of this programme" link on each
+// module card (setModuleExcluded) — see buildOverviewPage.
+function excludedModuleSet(prog){
+  const raw=prog&&prog.excluded_modules;
+  if(!raw)return new Set();
+  const arr=Array.isArray(raw)?raw:(typeof raw==='string'?(()=>{try{return JSON.parse(raw);}catch{return[];}})():[]);
+  return new Set(arr.map(n=>+n).filter(n=>!isNaN(n)));
+}
 function displayModuleNums(prog){
   // allModuleNums() reports every module_N_dates column that exists on the
   // row, including ones that are merely present-but-null (e.g. module_5_dates
@@ -3283,7 +3296,12 @@ function displayModuleNums(prog){
   // "Module 5" slot on every programme. Keep showing 1-4 always (original
   // behaviour, lets PMs fill in dates), only show 5+ once it actually has a
   // date set — i.e. someone deliberately added it via "+ Add Module".
+  // Modules a PM has explicitly excluded (excludedModuleSet) are dropped
+  // entirely — they don't belong on this programme, so nothing should ever
+  // ask for their dates, narrative, or show them on the timeline.
+  const excluded=excludedModuleSet(prog);
   return allModuleNums(prog).filter(n=>{
+    if(excluded.has(n))return false;
     if(n<=4)return true;
     const d=prog&&prog[`module_${n}_dates`];
     return d&&String(d).trim()!=='';
@@ -3896,11 +3914,13 @@ function generateReport(skipChecklistGate){
   // Occupational: only count/print modules that actually exist on this programme
   // (module_N_dates set) — mirrors the _updateProgressPanel checklist logic.
   // Falls back to all 4 if no module dates are set at all.
+  const excludedMods=excludedModuleSet(prog);
   let activeMods=allModuleNums(prog).filter(m=>{
+    if(excludedMods.has(m))return false;
     const d=prog[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
-  if(!activeMods.length)activeMods=[1,2,3,4];
+  if(!activeMods.length)activeMods=[1,2,3,4].filter(m=>!excludedMods.has(m));
   const assessPageCount=isLegacy?legacyAssessPages:activeMods.length;
   TOTAL_PAGES=1+1+1+participationPages+1+assessPageCount+1+1+2; // +1 exec summary, +1 for notes page
 
@@ -4433,11 +4453,13 @@ function buildCohortSummary(pLearners){
   // Per-module competency — only for modules that actually exist on this
   // programme (module_N_dates set), matching the activeMods pattern used
   // elsewhere so inactive modules don't show as permanent zero rows.
+  const excludedModsForCards=excludedModuleSet(activeProgramme);
   let activeMods=allModuleNums(activeProgramme).filter(m=>{
+    if(excludedModsForCards.has(m))return false;
     const d=activeProgramme[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
-  if(!activeMods.length)activeMods=[1,2,3,4]; // fallback: no dates set yet, keep prior behaviour
+  if(!activeMods.length)activeMods=[1,2,3,4].filter(m=>!excludedModsForCards.has(m)); // fallback: no dates set yet, keep prior behaviour
   const modCards=activeMods.map(m=>{
     let comp=0,nyc=0,blank=0;
     pLearners.forEach(l=>{
@@ -4592,7 +4614,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     // cls is a legacy CSS hook (.mod-card.m1..m4); harmless beyond m4 since the
     // inline --mc custom property (set below) always overrides the CSS fallback colour.
     const fieldMap=moduleFieldMap(modNums);
-    return{cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
+    return{num:n,cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
       qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null,
       applies:legacy?null:moduleAppliesTypes(prog,n)};
   });
@@ -4653,18 +4675,36 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         <div class="mod-dates-print">${esc(m.dates||'—')}</div>
         <div class="mod-units">${m.units}</div>
         ${progressHtml}
+        ${needsInput&&m.num<=4?`<div class="no-print" style="margin-top:6px;text-align:center"><a href="javascript:void(0)" style="font-size:7pt;color:rgba(255,255,255,.35);text-decoration:underline" onclick="if(confirm('Mark Module ${m.num} as not part of this programme? It will stop being required before a report can be sent, and will drop off the report and this timeline. You can restore it later.'))setModuleExcluded(${m.num},true)">Not part of this programme</a></div>`:''}
       </div>`;}).join('')}
     </div>
+    ${(()=>{
+      // Modules 1–4 that have been marked excluded don't get a card above
+      // (displayModuleNums drops them) — surface them here so a PM can see
+      // what's hidden and undo it, rather than the module just vanishing
+      // with no trace.
+      const excludedNums=[...excludedModuleSet(prog)].filter(n=>n>=1&&n<=4).sort((a,b)=>a-b);
+      if(!excludedNums.length)return'';
+      return `<div class="no-print" style="font-size:7.5pt;color:rgba(255,255,255,.35);margin:-4px 0 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span>Not part of this programme: ${excludedNums.map(n=>`Module ${n}`).join(', ')}</span>
+        ${excludedNums.map(n=>`<a href="javascript:void(0)" style="color:var(--gold2);text-decoration:underline" onclick="setModuleExcluded(${n},false)">Restore Module ${n}</a>`).join('')}
+      </div>`;
+    })()}
     <div id="overview-narratives" class="sec-header" style="margin-top:12px"><div class="sec-accent" style="background:var(--red)"></div>
       <div><div class="sec-title">Overall Feedback</div></div>
     </div>`;
 
-  ['Module 1','Module 2','Module 3','Module 4'].forEach((m,i)=>{
-    const key=`feedback_m${i+1}`;
-    const modCls=['m1','m2','m3','m4'][i];
+  // Only one Module N feedback block per module this programme actually
+  // runs (modNums already excludes anything in excluded_modules — see
+  // displayModuleNums) — a deleted/not-applicable module no longer gets a
+  // permanently-empty "Module 4" box on the client-facing report.
+  modNums.filter(n=>n<=4).forEach(n=>{
+    const key=`feedback_m${n}`;
+    const modCls=`m${n}`;
+    const label=`Module ${n}`;
     body+=`<div class="narrative-block mod-feedback-card" style="--mc:var(--${modCls})">
-      <div class="narrative-label">${m} <span class="lbl-sub">Submissions &amp; Competencies</span></div>
-      ${narField(key,`Describe submission status, assessor progress, exam results for ${m}…`,nar[key],'44px')}
+      <div class="narrative-label">${label} <span class="lbl-sub">Submissions &amp; Competencies</span></div>
+      ${narField(key,`Describe submission status, assessor progress, exam results for ${label}…`,nar[key],'44px')}
     </div>`;
   });
 
@@ -4672,11 +4712,18 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     <div class="narrative-block">
       <div class="narrative-label">Attendance</div>
       ${narField('att_summary','Summary of attendance…',nar.att_summary||'','48px')}
-    </div>
+    </div>`;
+  // EISA is a QCTO/occupational concept — Legacy quals track Formative/
+  // Summative unit standards instead, so there's nothing to write here and
+  // the field (and its checklist requirement) is dropped for Legacy.
+  if(!legacy){
+    body+=`
     <div class="narrative-block">
       <div class="narrative-label">EISA</div>
       ${narField('eisa_summary','Notes on EISA booking and completion…',nar.eisa_summary||'','48px')}
-    </div>
+    </div>`;
+  }
+  body+=`
     <div class="narrative-block">
       <div class="narrative-label">Interaction &amp; Participation</div>
       ${narField('interaction','Notes on learner interaction and participation…',nar.interaction||'','48px')}
@@ -6540,6 +6587,43 @@ async function saveModDates(inp){
     showSaved();
     toast('Offline — module dates queued for sync','info',3000);
   }
+}
+
+// ── Exclude/restore a module that doesn't apply to this programme ──
+// Marks module N as not part of the programme (e.g. a 3-module programme,
+// or a module that genuinely hasn't started and won't for a while) so the
+// Report Generator stops requiring its date/narrative before a report can
+// be sent. See excludedModuleSet()/displayModuleNums() for how this is
+// consumed everywhere a module list is built.
+async function setModuleExcluded(n,excluded){
+  if(!activeProgramme)return;
+  const current=[...excludedModuleSet(activeProgramme)];
+  const next=excluded?[...new Set([...current,n])]:current.filter(m=>m!==n);
+  next.sort((a,b)=>a-b);
+  activeProgramme.excluded_modules=next;
+  const idx=programmes.findIndex(p=>p.id===activeProgramme.id);
+  if(idx>-1)programmes[idx]=activeProgramme;
+  saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+  _lastGenKey=null; // force the overview/module cards to rebuild with the new module list
+  if(isOnline&&!isTempId(activeProgramme.id)){
+    try{
+      await sbPatch('programmes',activeProgramme.id,{excluded_modules:next});
+      showSaved();
+    }catch(e){
+      console.warn('Module exclusion patch failed:',e.message);
+      enqueueWrite('patch','programmes',{excluded_modules:next},activeProgramme.id);
+      updateQueueBadge();
+      toast('Change queued for retry when online','warn');
+      showSaved();
+    }
+  } else if(isOnline){
+    showSaved();
+  } else {
+    toast('Offline — change queued for sync','info',3000);
+  }
+  toast(excluded?`Module ${n} marked as not part of this programme`:`Module ${n} restored`,'info',3500);
+  generateReport();
+  updateProgressPanel();
 }
 
 let autoSaveTimer=null;
@@ -13514,7 +13598,16 @@ function _updateProgressPanel(){
   items.push({id:'comments',label:'Facilitator Observations',state:allComments?'done':hasComments?'partial':'',anchor:'comments'});
 
   // 8. Narrative fields — Overview page text blocks
-  const narKeys=['feedback_m1','feedback_m2','feedback_m3','feedback_m4','att_summary','eisa_summary','interaction','concerns','time_keeping'];
+  // Only require a Module N narrative for modules this programme actually
+  // runs (excludedModuleSet) — a module marked "not part of this programme"
+  // (e.g. deleted, or genuinely not started and not expected for a while)
+  // shouldn't keep the checklist stuck forever waiting on it.
+  // EISA is dropped entirely for Legacy qualifications — Legacy has its own
+  // Formative/Summative unit-standard tracking, not a QCTO EISA process, so
+  // there's nothing meaningful for a PM to write here.
+  const legacyForNar=isLegacyProgramme(activeProgramme);
+  const narModNums=displayModuleNums(activeProgramme).filter(n=>n<=4);
+  const narKeys=[...narModNums.map(n=>`feedback_m${n}`),'att_summary',...(legacyForNar?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
   const narLabels={feedback_m1:'Module 1 Narrative',feedback_m2:'Module 2 Narrative',feedback_m3:'Module 3 Narrative',feedback_m4:'Module 4 Narrative',att_summary:'Attendance Summary',eisa_summary:'EISA',time_keeping:'Time Keeping',interaction:'Interaction & Participation',concerns:'Concerns'};
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
