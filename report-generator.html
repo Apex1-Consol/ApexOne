@@ -16,7 +16,7 @@
   --danger:#C8272C;--danger-bg:#FFF0F0;
   --muted:#718096;--body:#4A5568;--dark:#1E2533;
   --border:#DEE5EF;--surface:#F8FAFC;--white:#FFFFFF;
-  --m1:#1A365D;--m2:#0F6B6B;--m3:#5B3A8C;--m4:#B84E0A;
+  --m1:#1A365D;--m2:#0F6B6B;--m3:#5B3A8C;--m4:#B84E0A;--m5:#2F855A;
   --font:'DM Sans',system-ui,sans-serif;
   --mono:'DM Mono',monospace;
   --r:8px;--r2:12px;
@@ -480,6 +480,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .mod-section-header.m2{background:var(--m2)}
 .mod-section-header.m3{background:var(--m3)}
 .mod-section-header.m4{background:var(--m4)}
+.mod-section-header.m5{background:var(--m5)}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:7pt;font-weight:700;padding:3px 9px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
@@ -5020,6 +5021,7 @@ function addAttDate(){
   if(inp)inp.value='';
   rebuildAttendancePage();
   autoSave();
+  updateProgressPanel();
   toast(`Date added: ${key}`,'success',2500);
 }
 
@@ -5032,7 +5034,8 @@ function renameAttDate(oldKey,newLabel){
   autoSave();
 }
 
-function removeAttDate(dateKey){
+async function removeAttDate(dateKey){
+  if(!confirm('Remove this date from the attendance register? This deletes the recorded attendance for all learners on this date.'))return;
   const pLearners=getProgrammeLearners();
   pLearners.forEach(l=>{
     if(attState[l.id])delete attState[l.id][dateKey];
@@ -5043,14 +5046,31 @@ function removeAttDate(dateKey){
       });
     }
   });
+  // Delete the corresponding rows from Supabase too — without this, the date
+  // only disappeared from the in-memory view and reappeared (with its old
+  // P/A/R values) the next time attendance was refetched from the server.
+  if(dateKey!==ATT_DATE_SENTINEL&&activeProgramme&&isOnline&&!isTempId(activeProgramme.id)){
+    try{
+      await fetch(`${SB_URL}/rest/v1/attendance?tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${activeProgramme.id}&session_date=eq.${dateKey}`,{method:'DELETE',headers:HEADERS});
+    }catch(e){
+      console.warn('Attendance date delete failed:',e.message);
+      toast('Date removed locally, but the server copy may reappear — check your connection and try again.','warn',5000);
+    }
+  }
   rebuildAttendancePage();
   autoSave();
+  updateProgressPanel();
 }
 
 function buildAssessmentPage(pLearners,modNum,nar,pn){
-  const mColors=['','m1','m2','m3','m4'];
-  const mColor=mColors[modNum];
-  const units=[,['KM-01','PM-01','WM-01'],['KM-02','PM-02','WM-02'],['KM-03','PM-03','WM-03'],['KM-04','PM-04','WM-04']][modNum];
+  // Computed rather than a fixed-size lookup table — a hardcoded 4-entry
+  // array here used to throw (units[0] on undefined) for any occupational
+  // programme with a Module 5+ added via "+ Add Module", since allModuleNums()
+  // already supports 5+ modules but this table didn't.
+  const mColors=['','m1','m2','m3','m4','m5'];
+  const mColor=mColors[modNum]||mColors[((modNum-1)%5)+1];
+  const mm=String(modNum).padStart(2,'0');
+  const units=['KM-'+mm,'PM-'+mm,'WM-'+mm];
   const applies=moduleAppliesTypes(activeProgramme,modNum);
   // Only show/require the KM/PM/WM columns actually registered for this module
   // (see moduleAppliesTypes) instead of always rendering all three — a module
@@ -6129,6 +6149,14 @@ function daAccept(){
     ?document.getElementById('da-edit-area').value
     :_daState.drafts[key];
   const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
+  const existing=ta?ta.value:(narratives[key]||'');
+  // Some fields (e.g. Time Keeping) have no auto-draft logic and always
+  // compute to ''. Without this guard, clicking Accept on such a field
+  // silently overwrote — blanked — any content the PM had already typed in.
+  if(!draft&&existing){
+    toast(`No auto-draft available for "${DA_LABELS[key]}" — use Skip to keep the existing text, or Edit to write one manually.`,'warn',5000);
+    return;
+  }
   if(ta){
     _daState.undoMap[key]=ta.value; // store for potential undo
     ta.value=draft;
@@ -6269,6 +6297,7 @@ function selectPreset(i){
 function applyBulkComment(overwrite=false){
   const text=document.getElementById('bulk-comment-text')?.value?.trim();
   if(!text)return;
+  if(!narratives._comments)narratives._comments={};
   document.querySelectorAll('.comment-ta').forEach(ta=>{
     if(overwrite||!ta.value.trim()){
       const firstName=ta.dataset.firstName||'';
@@ -6279,14 +6308,21 @@ function applyBulkComment(overwrite=false){
       const lid=ta.dataset.commentLid;
       const printEl=document.querySelector(`[data-comment-print="${lid}"]`);
       if(printEl)printEl.textContent=personalised;
+      // Mirror syncComment()'s bookkeeping — without this the checklist's
+      // Facilitator Observations item read stale narratives._comments and
+      // didn't reflect a bulk-applied comment until an individual field
+      // was edited afterward.
+      narratives._comments[lid]=personalised;
       syncCommentToSupabase(lid, personalised);
     }
   });
   autoSave();
   updateCommentCounter();
+  updateProgressPanel();
 }
 function clearAllComments(){
   if(!confirm('Clear all learner comments? This cannot be undone.'))return;
+  if(!narratives._comments)narratives._comments={};
   document.querySelectorAll('.comment-ta').forEach(ta=>{
     ta.value='';
     ta.classList.remove('comment-customised','comment-default');
@@ -6294,10 +6330,12 @@ function clearAllComments(){
     const lid=ta.dataset.commentLid;
     const printEl=document.querySelector(`[data-comment-print="${lid}"]`);
     if(printEl)printEl.textContent='';
+    narratives._comments[lid]='';
     syncCommentToSupabase(lid,'');
   });
   autoSave();
   updateCommentCounter();
+  updateProgressPanel();
 }
 function updateCommentCounter(){
   const all=document.querySelectorAll('.comment-ta');
@@ -6587,6 +6625,10 @@ async function saveModDates(inp){
     showSaved();
     toast('Offline — module dates queued for sync','info',3000);
   }
+  // Without this, filling in the last missing module date left the "Module
+  // Dates" checklist item stale/incomplete until an unrelated field (e.g. an
+  // attendance cell) happened to trigger a recompute.
+  updateProgressPanel();
 }
 
 // ── Exclude/restore a module that doesn't apply to this programme ──
