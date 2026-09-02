@@ -2340,8 +2340,8 @@ body.compact-density .progress-bar-wrap{height:6px}
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="btn btn-ghost" style="font-size:8.5pt;padding:9px 16px" onclick="openLRC(0)">🪪 Learner Cards</button>
-      <button class="btn btn-ghost" style="font-size:8.5pt;padding:9px 16px" onclick="openEisaPaste()">📋 Bulk EISA</button>
-      <button id="eisa-undo-btn" class="btn btn-ghost" style="font-size:8.5pt;padding:9px 16px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoEisaPaste()" title="Undo last bulk paste">↩ Undo Paste</button>
+      <button class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px" onclick="openEisaPaste()">📋 Bulk EISA</button>
+      <button id="eisa-undo-btn" class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoEisaPaste()" title="Undo last bulk paste">↩ Undo Paste</button>
       <button id="progress-panel-toggle" onclick="toggleProgressPanel()" title="Report content checklist — separate from the setup steps above">
         ☑ Report Content <span id="pp-score">—</span>
       </button>
@@ -3929,6 +3929,21 @@ function generateReport(skipChecklistGate){
   document.getElementById('report-preview').classList.add('show');
   document.getElementById('loading-state').style.display='none';
   hideDashboard();
+  // Bulk EISA paste and the review-bar's per-module EISA tags are a QCTO/
+  // occupational concept (KM/PM/WM/exam bulk entry) — Legacy tracks per-unit-
+  // standard Formative/Summative results instead, which this modal can't
+  // write to, so both are hidden rather than shown-but-useless on a Legacy report.
+  document.querySelectorAll('.eisa-occupational-only').forEach(el=>{
+    if(el.id==='eisa-undo-btn'){ // has its own show/hide logic keyed off the undo stack
+      if(isLegacy)el.style.display='none';else if(typeof _eisaUndoBtnSync==='function')_eisaUndoBtnSync();
+    }else{
+      el.style.display=isLegacy?'none':'';
+    }
+  });
+  document.querySelectorAll('.review-tag-chip[data-tag^="eisa-mod-"]').forEach(el=>{
+    const modN=el.getAttribute('data-tag').replace('eisa-mod-','');
+    el.textContent=isLegacy?`Module ${modN}`:`Module ${modN} EISA`;
+  });
 
   const pages=document.getElementById('report-pages');
   pages.innerHTML='';
@@ -4257,26 +4272,51 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
     if(anyNYC)flaggedModules++;
   });
   const nCount=pLearners.length;
-  // ── EISA booked/completed stats ──
-  // Completed: learner is 'C' on every applicable KM/PM/WM (per moduleAppliesTypes)
-  // + Exam V1, across every module that currently has dates set (timelineMods).
-  // Booked: PM-entered figure (no booking data exists elsewhere in the app) — see
-  // moduleAppliesTypes-adjacent note; defaults to full cohort until a PM edits it.
-  const eisaActiveModNums=timelineMods.map(m=>m.n);
-  const eisaCompletedCount=eisaActiveModNums.length?pLearners.filter(l=>eisaActiveModNums.every(m=>{
-    const res=(eisaState[l.id]||{})[m]||{};
-    const ek=`${l.id}_m${m}`;
+  // EISA (booked/completed, KM/PM/WM-based) is a QCTO/occupational concept —
+  // Legacy quals track per-unit-standard Formative+Summative credits instead,
+  // so the Exec Summary's progress widget swaps to a Unit Standards / credits
+  // view for Legacy rather than showing a fabricated EISA-completion number.
+  const legacy=isLegacyProgramme(prog);
+  let eisaCompletedCount=0,eisaBookedCount=0,eisaCompletedPct=null,eisaBookedPct=0;
+  let usEarnedCredits=0,usTotalCredits=0,usPct=null;
+  if(legacy){
+    // ── Unit standards credit progress ──
+    // Achieved = Formative AND Summative both 'C' for that learner+unit
+    // (same rule as buildLegacyAssessmentPages' per-module credit total).
+    const legacyUnits=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
     const ov=narratives._eisa||{};
-    const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
-    const applies=moduleAppliesTypes(activeProgramme,m);
-    const ev1=mv('examv1',res.examv1);
-    const requiredVals=[...(applies.km?[mv('km',res.km)]:[]),...(applies.pm?[mv('pm',res.pm)]:[]),...(applies.wm?[mv('wm',res.wm)]:[])];
-    return requiredVals.every(v=>v==='C')&&(ev1==='C'||ev1===''||ev1==='N/A');
-  })).length:0;
-  const eisaBookedRaw=narratives.eisa_booked;
-  const eisaBookedCount=eisaBookedRaw!==undefined&&eisaBookedRaw!==null&&eisaBookedRaw!==''?Math.max(0,Math.min(nCount,parseInt(eisaBookedRaw,10)||0)):nCount;
-  const eisaCompletedPct=nCount>0?Math.round(eisaCompletedCount/nCount*100):null;
-  const eisaBookedPct=nCount>0?Math.round(eisaBookedCount/nCount*100):0;
+    const perLearnerCredits=legacyUnits.reduce((s,u)=>s+(+u.credits||0),0);
+    usTotalCredits=perLearnerCredits*nCount;
+    pLearners.forEach(l=>{
+      legacyUnits.forEach(u=>{
+        const fv=ov[usFormativeKey(l.id,u.id)]||'';
+        const sv=ov[usSummativeKey(l.id,u.id)]||'';
+        if(fv==='C'&&sv==='C')usEarnedCredits+=(+u.credits||0);
+      });
+    });
+    usPct=usTotalCredits>0?Math.round(usEarnedCredits/usTotalCredits*100):null;
+  }else{
+    // ── EISA booked/completed stats ──
+    // Completed: learner is 'C' on every applicable KM/PM/WM (per moduleAppliesTypes)
+    // + Exam V1, across every module that currently has dates set (timelineMods).
+    // Booked: PM-entered figure (no booking data exists elsewhere in the app) — see
+    // moduleAppliesTypes-adjacent note; defaults to full cohort until a PM edits it.
+    const eisaActiveModNums=timelineMods.map(m=>m.n);
+    eisaCompletedCount=eisaActiveModNums.length?pLearners.filter(l=>eisaActiveModNums.every(m=>{
+      const res=(eisaState[l.id]||{})[m]||{};
+      const ek=`${l.id}_m${m}`;
+      const ov=narratives._eisa||{};
+      const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
+      const applies=moduleAppliesTypes(activeProgramme,m);
+      const ev1=mv('examv1',res.examv1);
+      const requiredVals=[...(applies.km?[mv('km',res.km)]:[]),...(applies.pm?[mv('pm',res.pm)]:[]),...(applies.wm?[mv('wm',res.wm)]:[])];
+      return requiredVals.every(v=>v==='C')&&(ev1==='C'||ev1===''||ev1==='N/A');
+    })).length:0;
+    const eisaBookedRaw=narratives.eisa_booked;
+    eisaBookedCount=eisaBookedRaw!==undefined&&eisaBookedRaw!==null&&eisaBookedRaw!==''?Math.max(0,Math.min(nCount,parseInt(eisaBookedRaw,10)||0)):nCount;
+    eisaCompletedPct=nCount>0?Math.round(eisaCompletedCount/nCount*100):null;
+    eisaBookedPct=nCount>0?Math.round(eisaBookedCount/nCount*100):0;
+  }
   const headline=avgAtt!==null
     ?`${nCount} learner${nCount!==1?'s':''} enrolled, averaging ${avgAtt}% attendance across the reporting period.${flaggedModules?` ${flaggedModules} module${flaggedModules!==1?'s':''} flagged with outstanding "Not Yet Competent" results requiring follow-up.`:' No outstanding competency concerns at this time.'}`
     :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period.`;
@@ -4366,14 +4406,25 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
         <div style="text-align:center;padding-top:2px">
           <svg viewBox="0 0 120 120" width="90" height="90" style="margin:0 auto;display:block">
             <circle cx="60" cy="60" r="50" fill="none" stroke="#F1F5F9" stroke-width="10"/>
-            ${eisaCompletedPct!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${eisaCompletedPct>=80?'#1B7A4A':eisaCompletedPct>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(eisaCompletedPct/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
-            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${eisaCompletedPct!==null?eisaCompletedPct+'%':'—'}</text>
-            <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">EISA</text>
+            ${(legacy?usPct:eisaCompletedPct)!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${(legacy?usPct:eisaCompletedPct)>=80?'#1B7A4A':(legacy?usPct:eisaCompletedPct)>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${((legacy?usPct:eisaCompletedPct)/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
+            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${(legacy?usPct:eisaCompletedPct)!==null?(legacy?usPct:eisaCompletedPct)+'%':'—'}</text>
+            <text x="60" y="73" text-anchor="middle" font-size="${legacy?6.5:7.5}" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">${legacy?'UNIT STANDARDS':'EISA'}</text>
           </svg>
-          <div style="font-size:8px;color:#94A3B8;margin-top:6px">completed</div>
+          <div style="font-size:8px;color:#94A3B8;margin-top:6px">${legacy?'credits achieved':'completed'}</div>
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
-          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">EISA progress</div>
+          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">${legacy?'Unit Standards progress':'EISA progress'}</div>
+          ${legacy?`
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+                <span style="font-size:10.5px;color:#1E2533;font-weight:600">Credits Achieved</span>
+                <span style="font-size:9px;color:#0F6B6B;font-weight:700">${usEarnedCredits} of ${usTotalCredits}</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${usPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
+            </div>
+            ${!usTotalCredits?`<div style="font-size:9px;color:#94A3B8">No unit standards registered for this programme yet.</div>`:''}
+          </div>`:`
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
@@ -4395,7 +4446,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
               </div>
               <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${eisaCompletedPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
             </div>
-          </div>
+          </div>`}
         </div>
       </div>
       <div class="exec-headline" style="margin-top:20px;padding:18px 22px;background:linear-gradient(90deg,${p.gradFrom}12,transparent);border-left:4px solid ${p.accentFrom};border-radius:0 8px 8px 0">
