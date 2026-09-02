@@ -5030,6 +5030,8 @@ function makeAttPageWrap(pLearners,attDates,pn=4){
       </label>
       <input type="date" id="att-new-date" class="att-date-input" title="Pick a session date">
       <button class="btn btn-ghost" style="padding:7px 16px;font-size:8.5pt;white-space:nowrap" onclick="addAttDate()">＋ Add Date</button>
+      <button class="btn btn-ghost" style="padding:7px 16px;font-size:8.5pt;white-space:nowrap" onclick="openAttPaste()" title="Paste a whole attendance register from Excel">📋 Bulk Attendance</button>
+      <button id="att-undo-btn" class="btn btn-ghost" style="padding:7px 16px;font-size:8.5pt;white-space:nowrap;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoAttPaste()" title="Undo last bulk paste">↩ Undo Paste</button>
     </div>`;
   wrap.appendChild(toolbar);
   wrap.appendChild(buildAttendancePage(pLearners,attDates,narratives,pn));
@@ -13419,6 +13421,36 @@ async function runExportWithFilter(){
     </div>
   </div>
 </div>
+<!-- ── BULK ATTENDANCE PASTE MODAL ── -->
+<div id="att-paste-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1a2744;border:1px solid rgba(255,255,255,.15);border-radius:12px;width:100%;max-width:980px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <!-- Header -->
+    <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Attendance Entry</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste your whole register from Excel — first row: <span style="font-family:var(--mono);color:var(--gold2)">ID Number</span> then one column per session date. Rows below: ID Number then <span style="font-family:var(--mono);color:var(--gold2)">P / A / N/A / R</span> per date. Dates not already on the report are added automatically.</div>
+      </div>
+      <button onclick="closeAttPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <!-- Paste area -->
+    <div style="padding:20px 24px 0;flex-shrink:0">
+      <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <textarea id="att-paste-area" rows="4" placeholder="ID Number&#9;2026-03-03&#9;2026-03-05&#9;2026-03-10&#10;9001234567890&#9;P&#9;P&#9;A&#10;8905123456789&#9;A&#9;P&#9;P" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseAttPaste()"></textarea>
+    </div>
+    <!-- Preview table -->
+    <div id="att-paste-preview" style="flex:1;overflow:auto;padding:14px 24px 20px;min-height:100px">
+      <div id="att-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>
+    </div>
+    <!-- Footer -->
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:10px">
+      <div id="att-paste-summary" style="font-size:9pt;color:rgba(255,255,255,.5)">—</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="closeAttPaste()">Cancel</button>
+        <button class="btn btn-success" id="att-paste-commit" disabled onclick="commitAttPaste()">✓ Apply to Report</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── Bulk EISA Paste ──
@@ -13648,6 +13680,230 @@ function commitEisaPaste(){
   _eisaUndoBtnSync();
   closeEisaPaste();
   updateProgressPanel();
+}
+</script>
+
+<script>
+// ── Bulk Attendance Paste ──
+// Whole-register paste: first pasted row is a header of session dates (one
+// per column, after the ID Number column), every row below is a learner's
+// P/A/N/A/R for each of those dates — i.e. exactly the shape of the register
+// most PMs already keep in Excel. Any header date not already on the report
+// is added as a new column automatically (same as clicking ＋ Add Date).
+let _attPasteRows=[];
+let _attPasteDateCols=[];
+let _attPasteUndoStack=[];
+
+function openAttPaste(){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  document.getElementById('att-paste-area').value='';
+  document.getElementById('att-paste-preview').innerHTML='<div id="att-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
+  document.getElementById('att-paste-summary').textContent='—';
+  document.getElementById('att-paste-commit').disabled=true;
+  _attPasteRows=[];_attPasteDateCols=[];
+  document.getElementById('att-paste-modal').style.display='flex';
+}
+
+function closeAttPaste(){
+  document.getElementById('att-paste-modal').style.display='none';
+}
+
+document.getElementById('att-paste-modal').addEventListener('click',function(e){
+  if(e.target===this)closeAttPaste();
+});
+
+function normAttStatus(v){
+  const u=(v||'').toUpperCase().trim();
+  if(u==='P'||u==='PRESENT')return'P';
+  if(u==='A'||u==='ABSENT')return'A';
+  if(u==='N/A'||u==='NA'||u==='NOT APPLICABLE')return'N/A';
+  if(u==='R'||u==='RESIGNED')return'R';
+  return''; // blank or unrecognised — left untouched rather than guessed at
+}
+
+function parseAttPaste(){
+  const raw=document.getElementById('att-paste-area').value.trim();
+  const preview=document.getElementById('att-paste-preview');
+  const summary=document.getElementById('att-paste-summary');
+  const commit=document.getElementById('att-paste-commit');
+
+  if(!raw){
+    preview.innerHTML='<div id="att-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
+    summary.textContent='—';commit.disabled=true;_attPasteRows=[];_attPasteDateCols=[];return;
+  }
+
+  const lines=raw.split('\n').map(l=>l.split('\t').map(c=>c.trim())).filter(r=>r.length>=1&&r.some(c=>c));
+  if(!lines.length){commit.disabled=true;return;}
+
+  // First row is always the header here (unlike Bulk EISA there's no reliable
+  // way to guess a headerless paste, since a bare date can't be told apart
+  // from other short strings without one).
+  const header=lines[0];
+  const existingDates=new Set(getAttDates());
+  _attPasteDateCols=header.slice(1).map((h,i)=>{
+    const dateKey=normDateKey(h);
+    const looksLikeDate=!!(dateKey&&/^\d{4}-\d{2}-\d{2}$/.test(dateKey));
+    return{col:i+1,raw:h,dateKey:looksLikeDate?dateKey:null,isNew:looksLikeDate&&!existingDates.has(dateKey)};
+  });
+  const validCols=_attPasteDateCols.filter(c=>c.dateKey);
+
+  if(!validCols.length){
+    preview.innerHTML=`<div style="padding:24px;text-align:center;color:#f87171;font-size:9.5pt">No date columns recognised in the header row.<br>First row should be: ID Number, then one column per session date.</div>`;
+    summary.textContent='0 date columns recognised';
+    commit.disabled=true;
+    return;
+  }
+
+  const dataLines=lines.slice(1);
+  const lMap={};
+  learners.forEach(l=>{if(l.id_number)lMap[l.id_number.trim()]=l;});
+  const idCounts={};
+  dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
+
+  _attPasteRows=dataLines.map((cols,i)=>{
+    const idNum=(cols[0]||'').trim();
+    const learner=lMap[idNum];
+    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':'ID not in roster');
+    const cells=validCols.map(c=>({dateKey:c.dateKey,status:normAttStatus(cols[c.col])}));
+    return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
+  });
+
+  const matched=_attPasteRows.filter(r=>r.learner&&!r.unmatchReason).length;
+  const unmatched=_attPasteRows.length-matched;
+  const noIdCount=_attPasteRows.filter(r=>r.unmatchReason==='No ID').length;
+  const dupCount=_attPasteRows.filter(r=>r.unmatchReason==='Duplicate ID').length;
+  const notInRosterCount=_attPasteRows.filter(r=>r.unmatchReason==='ID not in roster').length;
+  const newDateCount=validCols.filter(c=>c.isNew).length;
+  const skippedCols=_attPasteDateCols.length-validCols.length;
+
+  const badgeStatus=v=>{
+    if(v==='P')return`<span class="att-p" style="cursor:default">P</span>`;
+    if(v==='A')return`<span class="att-a" style="cursor:default">A</span>`;
+    if(v==='N/A')return`<span class="att-na" style="cursor:default">N/A</span>`;
+    if(v==='R')return`<span class="att-r" style="cursor:default">R</span>`;
+    return`<span style="color:rgba(255,255,255,.2)">—</span>`;
+  };
+
+  const headerRow=`<tr style="border-bottom:2px solid rgba(255,255,255,.15)">
+    <th style="text-align:left;padding:8px 10px;font-size:7.5pt;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);font-weight:700">ID Number</th>
+    <th style="text-align:left;padding:8px 10px;font-size:7.5pt;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);font-weight:700">Learner</th>
+    ${validCols.map(c=>`<th style="text-align:center;padding:8px 6px;font-size:7pt;letter-spacing:.04em;color:rgba(255,255,255,.4);font-weight:700;white-space:nowrap">${esc(c.dateKey)}${c.isNew?'<br><span style="color:var(--gold2);font-weight:700">NEW</span>':''}</th>`).join('')}
+  </tr>`;
+  const bodyRows=_attPasteRows.map(r=>{
+    const matchCell=(r.learner&&!r.unmatchReason)
+      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      :`<td style="color:#f87171;font-size:8pt;padding:7px 10px;white-space:nowrap">⚠ ${esc(r.unmatchReason)}</td>`;
+    return`<tr style="border-bottom:1px solid rgba(255,255,255,.07)">
+      <td style="font-family:var(--mono);font-size:8pt;color:rgba(255,255,255,.7);padding:7px 10px">${esc(r.idNum)}</td>
+      ${matchCell}
+      ${r.cells.map(c=>`<td style="text-align:center;padding:7px 6px">${badgeStatus(c.status)}</td>`).join('')}
+    </tr>`;
+  }).join('');
+  preview.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:9pt;color:#fff">
+    <thead>${headerRow}</thead><tbody>${bodyRows}</tbody>
+  </table>`;
+
+  const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
+  const colNote=skippedCols?` · ${skippedCols} column${skippedCols!==1?'s':''} skipped (not a recognised date)`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} date${validCols.length!==1?'s':''}${newDateCount?` (${newDateCount} new)`:''}${colNote}`;
+  commit.disabled=matched===0;
+}
+
+function _attUndoBtnSync(){
+  const btn=document.getElementById('att-undo-btn');
+  if(!btn)return;
+  if(_attPasteUndoStack.length){
+    const top=_attPasteUndoStack[_attPasteUndoStack.length-1];
+    btn.style.display='';
+    btn.title=`Undo: ${top.count} cell${top.count!==1?'s':''} pasted`;
+    btn.textContent=`↩ Undo Paste (${_attPasteUndoStack.length})`;
+  }else{
+    btn.style.display='none';
+  }
+}
+
+function undoAttPaste(){
+  if(!_attPasteUndoStack.length)return;
+  const entry=_attPasteUndoStack.pop();
+  entry.affected.forEach(({learnerId,dateKey,prev})=>{
+    if(!attState[learnerId])attState[learnerId]={};
+    attState[learnerId][dateKey]=prev||'';
+    const el=document.querySelector(`[data-att="${learnerId}_${dateKey}"]`);
+    if(el){el.textContent=prev||'—';applyAttStyle(el,prev||'');}
+    recalcAttPctRow(learnerId);
+  });
+  autoSave();
+  updateProgressPanel();
+  _attUndoBtnSync();
+  toast(`↩ Undid paste — ${entry.count} cell${entry.count!==1?'s':''} restored`,'info');
+}
+
+function commitAttPaste(){
+  const matched=_attPasteRows.filter(r=>r.learner&&!r.unmatchReason);
+  if(!matched.length)return;
+
+  const pLearners=getProgrammeLearners();
+  const newDateKeys=_attPasteDateCols.filter(c=>c.dateKey&&c.isNew).map(c=>c.dateKey);
+  // Add any brand-new date columns (same as addAttDate) before writing
+  // values, so the report has columns ready to receive them.
+  if(newDateKeys.length){
+    newDateKeys.forEach(key=>{
+      if(pLearners.length>0){
+        pLearners.forEach(l=>{
+          if(!attState[l.id])attState[l.id]={};
+          if(attState[l.id][key]===undefined)attState[l.id][key]='';
+        });
+      }else{
+        if(!attState[ATT_DATE_SENTINEL])attState[ATT_DATE_SENTINEL]={};
+        attState[ATT_DATE_SENTINEL][key]='';
+      }
+    });
+    rebuildAttendancePage(); // re-render so the new columns exist in the DOM
+  }
+
+  const affected=[];
+  const upserts=[];
+  matched.forEach(r=>{
+    const l=r.learner;
+    r.cells.forEach(c=>{
+      if(!c.status)return; // blank/unrecognised — leave the existing value alone
+      const prev=(attState[l.id]||{})[c.dateKey]||'';
+      if(prev===c.status)return; // no-op, keep the undo stack meaningful
+      affected.push({learnerId:l.id,dateKey:c.dateKey,prev});
+      if(!attState[l.id])attState[l.id]={};
+      attState[l.id][c.dateKey]=c.status;
+      const el=document.querySelector(`[data-att="${l.id}_${c.dateKey}"]`);
+      if(el){el.textContent=c.status;applyAttStyle(el,c.status);}
+      recalcAttPctRow(l.id);
+      if(activeProgramme&&!isNaN(+l.id)&&!isTempId(activeProgramme.id)){
+        upserts.push({
+          tenant_id:TENANT_DB_ID,learner_id:+l.id,programme_id:activeProgramme.id,
+          session_date:c.dateKey,status:c.status,
+        });
+      }
+    });
+  });
+
+  if(!affected.length){toast('Nothing to apply — every matched cell already matches','warn');return;}
+
+  _attPasteUndoStack.push({affected,count:affected.length});
+  if(_attPasteUndoStack.length>5)_attPasteUndoStack.shift();
+
+  autoSave();
+  updateProgressPanel();
+  _attUndoBtnSync();
+  toast(`✓ Applied ${affected.length} cell${affected.length!==1?'s':''} across ${matched.length} learner${matched.length!==1?'s':''}`,'success');
+  closeAttPaste();
+
+  if(upserts.length&&isOnline){
+    Promise.all(upserts.map(p=>sbUpsert('attendance',p)))
+      .catch(e=>{
+        console.warn('Bulk attendance sync failed:',e.message);
+        toast('Some attendance saves failed — queued for retry','warn');
+        upserts.forEach(p=>enqueueWrite('upsert','attendance',p,`${p.learner_id}_${p.programme_id}_${p.session_date}`));
+        updateQueueBadge();
+      });
+  }
 }
 </script>
 
