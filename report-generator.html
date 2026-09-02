@@ -13473,7 +13473,7 @@ async function runExportWithFilter(){
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk EISA Entry</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span></div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file.</div>
       </div>
       <button onclick="closeEisaPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
     </div>
@@ -13516,7 +13516,7 @@ async function runExportWithFilter(){
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Attendance Entry</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste your whole register from Excel — first row: <span style="font-family:var(--mono);color:var(--gold2)">ID Number</span> then one column per session date. Rows below: ID Number then <span style="font-family:var(--mono);color:var(--gold2)">P / A / N/A / R</span> per date. Dates not already on the report are added automatically.</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste your whole register from Excel — first row: <span style="font-family:var(--mono);color:var(--gold2)">ID Number</span> then one column per session date. Rows below: ID Number (or full name if no ID Number is on file) then <span style="font-family:var(--mono);color:var(--gold2)">P / A / N/A / R</span> per date. Dates not already on the report are added automatically.</div>
       </div>
       <button onclick="closeAttPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
     </div>
@@ -13589,7 +13589,7 @@ document.getElementById('bulk-dates-modal').addEventListener('click',function(e)
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div id="us-paste-title" style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Unit Standards Paste</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner:</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file):</div>
         <div id="us-paste-template" style="font-family:var(--mono);font-size:7.5pt;color:var(--gold2);background:rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;margin-top:6px;user-select:all;overflow-x:auto;white-space:nowrap"></div>
       </div>
       <button onclick="closeUsPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
@@ -13705,13 +13705,17 @@ function parseUsPaste(){
   const dataLines=lines.slice(1);
   const lMap={};
   learners.forEach(l=>{if(l.id_number)lMap[l.id_number.trim()]=l;});
+  const nameMap={};const nameDupes=new Set();
+  const normName=s=>(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  learners.forEach(l=>{const nk=normName((l.first_name||'')+' '+(l.last_name||''));if(!nk)return;if(nameMap[nk]&&nameMap[nk].id!==l.id)nameDupes.add(nk);else nameMap[nk]=l;});
   const idCounts={};
   dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
 
   _usPasteRows=dataLines.map((cols,i)=>{
     const idNum=(cols[0]||'').trim();
-    const learner=lMap[idNum];
-    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':'ID not in roster');
+    let learner=lMap[idNum];
+    if(!learner&&idNum){const nk=normName(idNum);if(nk&&nameMap[nk]&&!nameDupes.has(nk))learner=nameMap[nk];}
+    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
     const cells=validCols.map(c=>({...c,value:_usNormResult(cols[c.col])}));
     return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
   });
@@ -13859,6 +13863,9 @@ function parseEisaPaste(){
   // Build a learner lookup by id_number
   const lMap={};
   learners.forEach(l=>{if(l.id_number)lMap[l.id_number.trim()]=l;});
+  const nameMap={};const nameDupes=new Set();
+  const normName=s=>(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  learners.forEach(l=>{const nk=normName((l.first_name||'')+' '+(l.last_name||''));if(!nk)return;if(nameMap[nk]&&nameMap[nk].id!==l.id)nameDupes.add(nk);else nameMap[nk]=l;});
 
   // Count ID occurrences within the pasted data to flag in-paste duplicates
   const idCounts={};
@@ -13871,7 +13878,8 @@ function parseEisaPaste(){
   _eisaPasteRows=[];
   dataLines.forEach((cols,i)=>{
     const idNum=(cols[0]||'').trim();
-    const learner=lMap[idNum];
+    let learner=lMap[idNum];
+    if(!learner&&idNum){const nk=normName(idNum);if(nk&&nameMap[nk]&&!nameDupes.has(nk))learner=nameMap[nk];}
     const km=normResult(cols[1]);
     const pm=normResult(cols[2]);
     const wm=normResult(cols[3]);
@@ -13880,7 +13888,7 @@ function parseEisaPaste(){
     const examv2=normResult(cols[6]);
     const examv2_pct=normPct(cols[7]);
     const date=(cols[8]||'').trim();
-    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':'ID not in roster');
+    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
     _eisaPasteRows.push({idNum,learner,km,pm,wm,examv1,examv1_pct,examv2,examv2_pct,date,modNum,rowIdx:i+startIdx+1,unmatchReason});
   });
 
@@ -14119,13 +14127,17 @@ function parseAttPaste(){
   const dataLines=lines.slice(1);
   const lMap={};
   learners.forEach(l=>{if(l.id_number)lMap[l.id_number.trim()]=l;});
+  const nameMap={};const nameDupes=new Set();
+  const normName=s=>(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  learners.forEach(l=>{const nk=normName((l.first_name||'')+' '+(l.last_name||''));if(!nk)return;if(nameMap[nk]&&nameMap[nk].id!==l.id)nameDupes.add(nk);else nameMap[nk]=l;});
   const idCounts={};
   dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
 
   _attPasteRows=dataLines.map((cols,i)=>{
     const idNum=(cols[0]||'').trim();
-    const learner=lMap[idNum];
-    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':'ID not in roster');
+    let learner=lMap[idNum];
+    if(!learner&&idNum){const nk=normName(idNum);if(nk&&nameMap[nk]&&!nameDupes.has(nk))learner=nameMap[nk];}
+    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
     const cells=validCols.map(c=>({dateKey:c.dateKey,status:normAttStatus(cols[c.col])}));
     return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
   });
