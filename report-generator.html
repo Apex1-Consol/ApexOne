@@ -398,7 +398,10 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .draft-btn{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:5px 13px;font-family:var(--font);font-size:8pt;font-weight:700;color:var(--navy);background:var(--surface);border:1.5px solid var(--border);border-radius:999px;cursor:pointer;transition:.15s}
 .draft-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .draft-btn:disabled{opacity:.45;cursor:default}
+.draft-btn.draft-btn-nudge{border-color:#d4a017;box-shadow:0 0 0 2px rgba(212,160,23,.18);animation:draftNudgePulse 2.2s ease-in-out infinite}
+@keyframes draftNudgePulse{0%,100%{box-shadow:0 0 0 2px rgba(212,160,23,.18)}50%{box-shadow:0 0 0 4px rgba(212,160,23,.32)}}
 @media print{.draft-btn{display:none}}
+.draft-all-badge{background:#d4a017;color:#1a1a1a;border-radius:999px;padding:1px 6px;font-size:7pt;font-weight:800;margin-left:4px;display:none}
 /* ── Draft-All Review Panel ── */
 #da-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.55)}
 #da-panel{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);z-index:501;background:var(--surface);box-shadow:-4px 0 24px rgba(0,0,0,.18);display:none;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
@@ -1947,7 +1950,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     <button class="btn btn-ghost" onclick="openImportLmsModal()" title="Import a learner progress export pulled from the LMS">📊 Import LMS Report</button>
     <button class="btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
     <button class="btn btn-ghost" id="density-toggle-btn" onclick="toggleReportDensity()" title="Toggle compact/standard view" style="font-size:8pt;padding:9px 12px">⊞ Compact</button>
-    <button class="btn btn-ghost" onclick="openDraftAllPanel()" id="draft-all-btn" title="Draft all 7 narrative fields from live data, then review one by one">✨ Draft all</button>
+    <button class="btn btn-ghost" onclick="openDraftAllPanel()" id="draft-all-btn" title="Draft all narrative fields from live data, then review one by one">✨ Draft all<span id="draft-all-badge" class="draft-all-badge">0</span></button>
     <button class="btn btn-ghost" onclick="saveNarratives(true)">💾 Save Draft</button>
     <button class="btn btn-ghost" onclick="openHistoryPanel()">🕓 History<span id="review-pending-badge" class="review-pending-badge">0</span></button>
     <button class="btn btn-ghost" id="export-btn" onclick="openExportModal()" style="display:none">⬇️ Export</button>
@@ -4480,7 +4483,7 @@ function narField(key,placeholder,val,minH='72px',style=''){
   return`<div class="nar-wrap">
     <textarea class="narrative-textarea nar-screen" data-nar="${key}" oninput="syncNar(this)" placeholder="${placeholder}" style="min-height:${minH};${style}" spellcheck="true">${esc(v)}</textarea>
     <div class="nar-print" data-nar-print="${key}">${esc(v)||`<span style="color:#aaa;font-style:italic">${placeholder}</span>`}</div>
-    <button class="draft-btn nar-screen" type="button" onclick="draftNarrative('${key}',this)" title="Pre-fill from live cohort data">✨ Draft from data</button>
+    <button class="draft-btn nar-screen" type="button" data-draft-btn="${key}" onclick="draftNarrative('${key}',this)" title="Pre-fill from live cohort data">✨ Draft from data</button>
   </div>`;
 }
 
@@ -14363,6 +14366,23 @@ function _updateProgressPanel(){
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
   items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
+
+  // Discoverability nudge for "Draft from data" / "Draft all": badge the
+  // toolbar button with how many narrative fields are still empty, and put a
+  // gentle pulse on each empty field's own draft button so it's obvious
+  // there's a one-click fill available right where the PM is looking.
+  {
+    const emptyKeys=narKeys.filter(k=>!(narratives[k]&&narratives[k].trim().length>0));
+    const daBadge=document.getElementById('draft-all-badge');
+    if(daBadge){
+      if(emptyKeys.length>0){daBadge.textContent=String(emptyKeys.length);daBadge.style.display='inline-block';}
+      else{daBadge.style.display='none';}
+    }
+    document.querySelectorAll('[data-draft-btn]').forEach(btn=>{
+      const k=btn.getAttribute('data-draft-btn');
+      btn.classList.toggle('draft-btn-nudge', emptyKeys.includes(k));
+    });
+  }
 
   // ── Render ──
   const doneCount=items.filter(i=>i.state==='done').length;
