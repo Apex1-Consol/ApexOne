@@ -4545,8 +4545,12 @@ function getLearnerRiskLabel(l){
         if(v){total++;if(v==='NYC')nyc++;}
       });
     });
-    const lbv=ov[logbookKey(l.id)];
-    if(lbv){total++;if(lbv==='NYC')nyc++;}
+    // One logbook mark per module now (see legacyLogbookValue) — count each
+    // module's logbook as its own signal, same as before but per module.
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      const lbv=legacyLogbookValue(ov,l.id,modNum);
+      if(lbv){total++;if(lbv==='NYC')nyc++;}
+    });
     if(!total)return'Unknown';
     const pct=nyc/total;
     return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -4776,8 +4780,10 @@ function buildParticipationPage(pLearners,nar,pn=3){
         if(v){total++;if(v==='NYC')nyc++;}
       });
     });
-    const lbv=ov[logbookKey(l.id)];
-    if(lbv){total++;if(lbv==='NYC')nyc++;}
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      const lbv=legacyLogbookValue(ov,l.id,modNum);
+      if(lbv){total++;if(lbv==='NYC')nyc++;}
+    });
     if(!total)return'Unknown';
     const pct=nyc/total;
     return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -5121,21 +5127,27 @@ function usKey(learnerId,usCode){
   return`${learnerId}_us_${String(usCode).replace(/[^a-zA-Z0-9]/g,'')}`;
 }
 // Legacy quals track Formative + Summative per unit standard (credits require
-// both), plus one Logbook mark per learner for the whole qualification (not
-// per module — matches how logbooks are actually signed off in practice).
+// both), plus a Logbook mark per learner PER MODULE (each module's assessment
+// page is printed separately with its own logbook section — see
+// buildLegacyAssessmentPages). Logbook used to be tracked once per learner for
+// the whole qualification; logbookKey(learnerId) with no module number still
+// returns that old key so already-saved values aren't lost, and
+// legacyLogbookValue() below carries that old value forward as the starting
+// point for every module until a module's logbook is set individually.
 function usFormativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_formative';}
 function usSummativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_summative';}
-function logbookKey(learnerId){return`${learnerId}_logbook`;}
+function logbookKey(learnerId,modNum){return modNum!=null?`${learnerId}_m${modNum}_logbook`:`${learnerId}_logbook`;}
+function legacyLogbookValue(ov,learnerId,modNum){
+  const perModule=(ov||{})[logbookKey(learnerId,modNum)];
+  if(perModule!==undefined)return perModule;
+  return(ov||{})[logbookKey(learnerId)]||''; // pre-migration single value, carried forward
+}
 function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
-  const units=unitStandards
+  const allUnits=unitStandards
     .filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id)
     .sort((a,b)=>(a.mod||1)-(b.mod||1)||String(a.id).localeCompare(String(b.id)));
-  const totalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
-  const chunks=[];
-  for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
-  if(!chunks.length)chunks.push([]);
 
-  if(!units.length){
+  if(!allUnits.length){
     const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Unit Standards Achieved</span></div>
       <div style="padding:32px;text-align:center;color:var(--muted);font-size:9pt">
         No unit standards are registered for this programme yet.<br>
@@ -5144,66 +5156,79 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     return[pageShell(startPn,0,activeClient.client_name,'Assessment — Unit Standards',body)];
   }
 
-  return chunks.map((chunk,pageIdx)=>{
-    const tableId=`legacy-us-table-${pageIdx}`;
-    // Group units by module for the header bands — purely visual grouping,
-    // storage/credit tracking stays per unit standard (see design note above).
-    const modGroups=[];
-    units.forEach(u=>{
-      const modNum=u.mod||1;
-      let grp=modGroups.find(g=>g.mod===modNum);
-      if(!grp){grp={mod:modNum,units:[]};modGroups.push(grp);}
-      grp.units.push(u);
-    });
-    const mkFsCell=(key,val,uscode,credits,role)=>{
-      const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
-      const label=val==='C'?'Achieved':val==='NYC'?'Not Yet':'&#8212;';
-      return`<td style="text-align:center"><div><select class="result-select result-screen legacy-us-select" data-eisa="${key}" data-uscode="${esc(String(uscode))}" data-credits="${credits}" data-role="${role}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
-    };
-    const rows=chunk.map(l=>{
-      let earned=0;
-      let anyAssessed=false;
-      const unitCells=units.map(u=>{
-        const fKey=usFormativeKey(l.id,u.id),sKey=usSummativeKey(l.id,u.id);
-        const fv=(nar._eisa||{})[fKey]||'';
-        const sv=(nar._eisa||{})[sKey]||'';
-        const cr=+u.credits||0;
-        if(fv==='C'&&sv==='C')earned+=cr;
-        if(fv||sv)anyAssessed=true;
-        return mkFsCell(fKey,fv,u.id,cr,'formative')+mkFsCell(sKey,sv,u.id,cr,'summative');
-      }).join('');
-      const lbKey=logbookKey(l.id);
-      const lbVal=(nar._eisa||{})[lbKey]||'';
-      const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
-      const lbLabel=lbVal==='C'?'Achieved':lbVal==='NYC'?'Not Yet':'&#8212;';
-      const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
-      const complete=earned>=totalCredits&&totalCredits>0&&lbVal==='C';
-      const anyProgress=earned>0||lbVal==='C'||anyAssessed;
-      const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
-      return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${unitCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${totalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
-    }).join('');
-    const modBandRow=modGroups.map(g=>`<th colspan="${g.units.length*2}" style="text-align:center;background:${moduleColor(g.mod)}">Module ${g.mod}</th>`).join('');
-    const usHeaderRow=modGroups.map(g=>g.units.map(u=>`<th colspan="2" style="text-align:center;font-size:7pt" title="${esc(u.title||'')}">${esc(u.id)}<br><span style="font-weight:400;opacity:.7">${esc(String(u.credits||0))}cr</span></th>`).join('')).join('');
-    const fsHeaderRow=units.map(()=>`<th style="text-align:center;font-size:6.5pt">F</th><th style="text-align:center;font-size:6.5pt">S</th>`).join('');
-    const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
-      <tr><th rowspan="3">Learner Name</th>${modBandRow}<th rowspan="3">Logbook</th><th rowspan="3">Credits</th><th rowspan="3">Status</th></tr>
-      <tr>${usHeaderRow}</tr>
-      <tr>${fsHeaderRow}</tr>
-    </thead>`;
-    const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <span>Unit Standards Achieved &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${totalCredits} credits total</span>
-        <span class="no-print" style="display:flex;gap:6px">
-          <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','C')">Set all Achieved</button>
-          <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet</button>
-          <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
-        </span>
-      </div>
-      <div style="overflow-x:auto">
-        <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid;min-width:${360+units.length*2*42+90}px">${thead}<tbody>${rows}</tbody></table>
-      </div>
-      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">F = Formative &nbsp;&middot;&nbsp; S = Summative &nbsp;&middot;&nbsp; credit requires both &nbsp;&middot;&nbsp; Logbook tracked once per learner</span></div>`;
-    return pageShell(startPn+pageIdx,0,activeClient.client_name,'Assessment — Unit Standards'+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body);
+  // One or more pages PER MODULE (each with its own Logbook column, scoped to
+  // that module — see legacyLogbookValue) rather than one wide table spanning
+  // every module. A module's learners are still chunked by SPLIT if there are
+  // more than fit comfortably on one printed page.
+  const modGroups=[];
+  allUnits.forEach(u=>{
+    const modNum=u.mod||1;
+    let grp=modGroups.find(g=>g.mod===modNum);
+    if(!grp){grp={mod:modNum,units:[]};modGroups.push(grp);}
+    grp.units.push(u);
   });
+
+  const mkFsCell=(key,val,uscode,credits,role)=>{
+    const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
+    const label=val==='C'?'Achieved':val==='NYC'?'Not Yet':'&#8212;';
+    return`<td style="text-align:center"><div><select class="result-select result-screen legacy-us-select" data-eisa="${key}" data-uscode="${esc(String(uscode))}" data-credits="${credits}" data-role="${role}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
+  };
+
+  let pn=startPn;
+  const pages=[];
+  modGroups.forEach(grp=>{
+    const modNum=grp.mod,units=grp.units;
+    const modTotalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
+    const chunks=[];
+    for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
+    if(!chunks.length)chunks.push([]);
+
+    chunks.forEach((chunk,pageIdx)=>{
+      const tableId=`legacy-us-table-m${modNum}-${pageIdx}`;
+      const rows=chunk.map(l=>{
+        let earned=0;
+        let anyAssessed=false;
+        const unitCells=units.map(u=>{
+          const fKey=usFormativeKey(l.id,u.id),sKey=usSummativeKey(l.id,u.id);
+          const fv=(nar._eisa||{})[fKey]||'';
+          const sv=(nar._eisa||{})[sKey]||'';
+          const cr=+u.credits||0;
+          if(fv==='C'&&sv==='C')earned+=cr;
+          if(fv||sv)anyAssessed=true;
+          return mkFsCell(fKey,fv,u.id,cr,'formative')+mkFsCell(sKey,sv,u.id,cr,'summative');
+        }).join('');
+        const lbKey=logbookKey(l.id,modNum);
+        const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
+        const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
+        const lbLabel=lbVal==='C'?'Achieved':lbVal==='NYC'?'Not Yet':'&#8212;';
+        const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
+        const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
+        const anyProgress=earned>0||lbVal==='C'||anyAssessed;
+        const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+        return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${unitCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
+      }).join('');
+      const usHeaderRow=units.map(u=>`<th colspan="2" style="text-align:center;font-size:7pt" title="${esc(u.title||'')}">${esc(u.id)}<br><span style="font-weight:400;opacity:.7">${esc(String(u.credits||0))}cr</span></th>`).join('');
+      const fsHeaderRow=units.map(()=>`<th style="text-align:center;font-size:6.5pt">F</th><th style="text-align:center;font-size:6.5pt">S</th>`).join('');
+      const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
+        <tr><th rowspan="2">Learner Name</th>${usHeaderRow}<th rowspan="2">Logbook</th><th rowspan="2">Credits</th><th rowspan="2">Status</th></tr>
+        <tr>${fsHeaderRow}</tr>
+      </thead>`;
+      const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
+          <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
+          <span class="no-print" style="display:flex;gap:6px">
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','C')">Set all Achieved</button>
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet</button>
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
+          </span>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid;min-width:${360+units.length*2*42+90}px">${thead}<tbody>${rows}</tbody></table>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">F = Formative &nbsp;&middot;&nbsp; S = Summative &nbsp;&middot;&nbsp; credit requires both &nbsp;&middot;&nbsp; Logbook tracked per module</span></div>`;
+      pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
+    });
+  });
+  return pages;
 }
 function syncUsResult(sel){
   const printSpan=sel.nextElementSibling;
@@ -13052,7 +13077,10 @@ function _renderLRC(){
       <td style="text-align:center">${achieved?'<span class="lrc-badge c">Achieved</span>':'<span class="lrc-badge na">Not Yet</span>'}</td>
     </tr>`;
   }).join('');
-  const usLogbook=(narratives._eisa||{})[logbookKey(l.id)]||'';
+  // One logbook mark per module now — build a compact per-module list instead
+  // of a single qualification-wide value (see legacyLogbookValue).
+  const usLogbookMods=[...new Set(usUnits.map(u=>u.mod||1))].sort((a,b)=>a-b);
+  const usLogbookByMod=usLogbookMods.map(modNum=>({mod:modNum,val:legacyLogbookValue(narratives._eisa,l.id,modNum)}));
 
   // ── Comment ──
   const comment=(narratives._comments||{})[l.id]||remoteComments[`${l.id}_${month}`]||'';
@@ -13112,8 +13140,8 @@ function _renderLRC(){
           </tr></thead>
           <tbody>${usRows||`<tr><td colspan="5" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
         </table>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:8.5pt">
-          <span>Logbook: ${usLogbook==='C'?'<span class="lrc-badge c">Achieved</span>':usLogbook==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:8.5pt;flex-wrap:wrap;gap:8px">
+          <span style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">Logbook: ${usLogbookByMod.map(m=>`<span style="white-space:nowrap">M${m.mod} ${m.val==='C'?'<span class="lrc-badge c">Achieved</span>':m.val==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</span>`).join('')||'<span class="lrc-badge na">—</span>'}</span>
           <strong>Total Credits: ${usEarned} / ${usTotalCredits}</strong>
         </div>`:`<table class="lrc-eisa-table">
           <thead><tr>
