@@ -5355,6 +5355,8 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
       const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
           <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
           <span class="no-print" style="display:flex;gap:6px">
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/Logbook results from Excel">📋 Bulk Paste</button>
+            <button type="button" id="us-undo-btn-m${modNum}" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoUsPaste(${modNum})" title="Undo last bulk paste for this module">↩ Undo</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','C')">Set all Achieved</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
@@ -13580,6 +13582,236 @@ async function runExportWithFilter(){
 document.getElementById('bulk-dates-modal').addEventListener('click',function(e){
   if(e.target===this)closeBulkDatesModal();
 });
+</script>
+<!-- ── LEGACY UNIT STANDARDS BULK PASTE MODAL ── -->
+<div id="us-paste-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1a2744;border:1px solid rgba(255,255,255,.15);border-radius:12px;width:100%;max-width:980px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div id="us-paste-title" style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Unit Standards Paste</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner:</div>
+        <div id="us-paste-template" style="font-family:var(--mono);font-size:7.5pt;color:var(--gold2);background:rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;margin-top:6px;user-select:all;overflow-x:auto;white-space:nowrap"></div>
+      </div>
+      <button onclick="closeUsPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+    </div>
+    <div style="padding:16px 24px 0;flex-shrink:0">
+      <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <textarea id="us-paste-area" rows="4" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseUsPaste()"></textarea>
+    </div>
+    <div id="us-paste-preview" style="flex:1;overflow:auto;padding:14px 24px 20px;min-height:100px">
+      <div id="us-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:10px">
+      <div id="us-paste-summary" style="font-size:9pt;color:rgba(255,255,255,.5)">—</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="closeUsPaste()">Cancel</button>
+        <button class="btn btn-success" id="us-paste-commit" disabled onclick="commitUsPaste()">✓ Apply to Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('us-paste-modal').addEventListener('click',function(e){
+  if(e.target===this)closeUsPaste();
+});
+
+// ── Legacy Unit Standards Bulk Paste ──
+// One "📋 Bulk Paste" button per module page (buildLegacyAssessmentPages),
+// scoped to that module's registered unit standards. Column layout is
+// generated from the module's own unit standards so PMs paste in exactly
+// the shape the report expects: ID Number, then {US}-F/{US}-S per unit
+// standard, then Logbook. Values live in narratives._eisa the same way a
+// single dropdown edit would (see syncUsResult) — no separate local state
+// to keep in sync, unlike occupational EISA/attendance.
+let _usPasteModNum=null;
+let _usPasteUnits=[];
+let _usPasteRows=[];
+let _usPasteUndoStacks={}; // modNum -> [{affected:[{key,prev}],count}]
+
+function openUsResultsPaste(modNum){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  const units=unitStandards.filter(u=>(!u.saqa_id||u.saqa_id===activeProgramme.saqa_id)&&(u.mod||1)===modNum)
+    .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  if(!units.length){toast('No unit standards registered for this module','warn');return;}
+  _usPasteModNum=modNum;
+  _usPasteUnits=units;
+  const headerCols=['ID Number',...units.flatMap(u=>[`${u.id}-F`,`${u.id}-S`]),'Logbook'];
+  document.getElementById('us-paste-title').textContent=`📋 Bulk Unit Standards Paste — Module ${modNum}`;
+  document.getElementById('us-paste-template').textContent=headerCols.join('\t');
+  document.getElementById('us-paste-area').value='';
+  document.getElementById('us-paste-preview').innerHTML='<div id="us-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
+  document.getElementById('us-paste-summary').textContent='—';
+  document.getElementById('us-paste-commit').disabled=true;
+  _usPasteRows=[];
+  document.getElementById('us-paste-modal').style.display='flex';
+}
+
+function closeUsPaste(){
+  document.getElementById('us-paste-modal').style.display='none';
+}
+
+function _usNormResult(v){
+  const u=(v||'').toUpperCase().trim();
+  if(u==='C'||u==='COMPETENT'||u==='ACHIEVED')return'C';
+  if(u==='NYC'||u==='NOT YET'||u==='NOT YET COMPETENT'||u==='NOT YET ACHIEVED')return'NYC';
+  return''; // blank or unrecognised — left untouched rather than guessed at
+}
+
+function _usColLabel(c){
+  if(c.type==='logbook')return'Logbook';
+  return`${c.usId}-${c.role==='formative'?'F':'S'}`;
+}
+
+function parseUsPaste(){
+  const raw=document.getElementById('us-paste-area').value.trim();
+  const preview=document.getElementById('us-paste-preview');
+  const summary=document.getElementById('us-paste-summary');
+  const commit=document.getElementById('us-paste-commit');
+
+  if(!raw){
+    preview.innerHTML='<div id="us-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
+    summary.textContent='—';commit.disabled=true;_usPasteRows=[];return;
+  }
+
+  const lines=raw.split('\n').map(l=>l.split('\t').map(c=>c.trim())).filter(r=>r.length>=1&&r.some(c=>c));
+  if(!lines.length){commit.disabled=true;return;}
+
+  // Match header columns to unit standards by normalised label (spaces,
+  // dashes and underscores stripped) so "10047-F", "10047 F" and "10047_F"
+  // all resolve the same way regardless of how Excel formatted the paste.
+  const colMap={};
+  _usPasteUnits.forEach(u=>{
+    const idNorm=String(u.id).toUpperCase().replace(/[\s_-]+/g,'');
+    colMap[idNorm+'F']={type:'unit',usId:u.id,role:'formative',credits:+u.credits||0};
+    colMap[idNorm+'S']={type:'unit',usId:u.id,role:'summative',credits:+u.credits||0};
+  });
+  const header=lines[0];
+  const allCols=header.slice(1).map((h,i)=>{
+    const norm=(h||'').toUpperCase().replace(/[\s_-]+/g,'');
+    if(norm==='LOGBOOK'||norm==='LB')return{col:i+1,type:'logbook',label:h};
+    if(colMap[norm])return{col:i+1,label:h,...colMap[norm]};
+    return{col:i+1,type:null,label:h};
+  });
+  const validCols=allCols.filter(c=>c.type);
+  const skippedCols=allCols.length-validCols.length;
+
+  if(!validCols.length){
+    preview.innerHTML=`<div style="padding:24px;text-align:center;color:#f87171;font-size:9.5pt">No recognised columns in the header row.<br>Copy the header template above into row 1 of your sheet.</div>`;
+    summary.textContent='0 columns recognised';
+    commit.disabled=true;
+    return;
+  }
+
+  const dataLines=lines.slice(1);
+  const lMap={};
+  learners.forEach(l=>{if(l.id_number)lMap[l.id_number.trim()]=l;});
+  const idCounts={};
+  dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
+
+  _usPasteRows=dataLines.map((cols,i)=>{
+    const idNum=(cols[0]||'').trim();
+    const learner=lMap[idNum];
+    const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':'ID not in roster');
+    const cells=validCols.map(c=>({...c,value:_usNormResult(cols[c.col])}));
+    return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
+  });
+
+  const matched=_usPasteRows.filter(r=>r.learner&&!r.unmatchReason).length;
+  const unmatched=_usPasteRows.length-matched;
+  const noIdCount=_usPasteRows.filter(r=>r.unmatchReason==='No ID').length;
+  const dupCount=_usPasteRows.filter(r=>r.unmatchReason==='Duplicate ID').length;
+  const notInRosterCount=_usPasteRows.filter(r=>r.unmatchReason==='ID not in roster').length;
+
+  const badgeResult=v=>v==='C'?`<span class="badge badge-c">C</span>`:v==='NYC'?`<span class="badge badge-nyc">NYC</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
+
+  const headerRow=`<tr style="border-bottom:2px solid rgba(255,255,255,.15)">
+    <th style="text-align:left;padding:8px 10px;font-size:7.5pt;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);font-weight:700">ID Number</th>
+    <th style="text-align:left;padding:8px 10px;font-size:7.5pt;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);font-weight:700">Learner</th>
+    ${validCols.map(c=>`<th style="text-align:center;padding:8px 6px;font-size:7pt;letter-spacing:.04em;color:rgba(255,255,255,.4);font-weight:700;white-space:nowrap">${esc(_usColLabel(c))}</th>`).join('')}
+  </tr>`;
+  const bodyRows=_usPasteRows.map(r=>{
+    const matchCell=(r.learner&&!r.unmatchReason)
+      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      :`<td style="color:#f87171;font-size:8pt;padding:7px 10px;white-space:nowrap">⚠ ${esc(r.unmatchReason)}</td>`;
+    return`<tr style="border-bottom:1px solid rgba(255,255,255,.07)">
+      <td style="font-family:var(--mono);font-size:8pt;color:rgba(255,255,255,.7);padding:7px 10px">${esc(r.idNum)}</td>
+      ${matchCell}
+      ${r.cells.map(c=>`<td style="text-align:center;padding:7px 6px">${badgeResult(c.value)}</td>`).join('')}
+    </tr>`;
+  }).join('');
+  preview.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:9pt;color:#fff">
+    <thead>${headerRow}</thead><tbody>${bodyRows}</tbody>
+  </table>`;
+
+  const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
+  const colNote=skippedCols?` · ${skippedCols} column${skippedCols!==1?'s':''} skipped (not recognised)`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} column${validCols.length!==1?'s':''}${colNote}`;
+  commit.disabled=matched===0;
+}
+
+function _usUndoBtnSync(modNum){
+  const btn=document.getElementById('us-undo-btn-m'+modNum);
+  if(!btn)return;
+  const stack=_usPasteUndoStacks[modNum]||[];
+  if(stack.length){
+    const top=stack[stack.length-1];
+    btn.style.display='';
+    btn.title=`Undo: ${top.count} cell${top.count!==1?'s':''} pasted`;
+    btn.textContent=`↩ Undo (${stack.length})`;
+  }else{
+    btn.style.display='none';
+  }
+}
+
+function undoUsPaste(modNum){
+  const stack=_usPasteUndoStacks[modNum]||[];
+  if(!stack.length)return;
+  const entry=stack.pop();
+  if(!narratives._eisa)narratives._eisa={};
+  entry.affected.forEach(({key,prev})=>{
+    narratives._eisa[key]=prev||'';
+    const el=document.querySelector(`[data-eisa="${key}"]`);
+    if(el){el.value=prev||'';el.dispatchEvent(new Event('change',{bubbles:true}));}
+  });
+  autoSave();
+  updateProgressPanel();
+  _usUndoBtnSync(modNum);
+  toast(`↩ Undid paste — ${entry.count} cell${entry.count!==1?'s':''} restored (Module ${modNum})`,'info');
+}
+
+function commitUsPaste(){
+  const matched=_usPasteRows.filter(r=>r.learner&&!r.unmatchReason);
+  if(!matched.length)return;
+  const modNum=_usPasteModNum;
+  if(!narratives._eisa)narratives._eisa={};
+
+  const affected=[];
+  matched.forEach(r=>{
+    const l=r.learner;
+    r.cells.forEach(c=>{
+      if(!c.value)return; // blank/unrecognised — leave the existing value alone
+      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?usFormativeKey(l.id,c.usId):usSummativeKey(l.id,c.usId));
+      const prev=narratives._eisa[key]||'';
+      if(prev===c.value)return; // no-op, keep the undo stack meaningful
+      affected.push({key,prev});
+      narratives._eisa[key]=c.value;
+      const el=document.querySelector(`[data-eisa="${key}"]`);
+      if(el){el.value=c.value;el.dispatchEvent(new Event('change',{bubbles:true}));}
+    });
+  });
+
+  if(!affected.length){toast('Nothing to apply — every matched cell already matches','warn');return;}
+
+  if(!_usPasteUndoStacks[modNum])_usPasteUndoStacks[modNum]=[];
+  _usPasteUndoStacks[modNum].push({affected,count:affected.length});
+  if(_usPasteUndoStacks[modNum].length>5)_usPasteUndoStacks[modNum].shift();
+
+  autoSave();
+  updateProgressPanel();
+  _usUndoBtnSync(modNum);
+  toast(`✓ Applied ${affected.length} cell${affected.length!==1?'s':''} across ${matched.length} learner${matched.length!==1?'s':''} — Module ${modNum}`,'success');
+  closeUsPaste();
+}
 </script>
 
 <script>
