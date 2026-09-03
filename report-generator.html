@@ -3766,9 +3766,68 @@ function getProgrammeLearners(){
   if(getProgrammeLearners._c&&getProgrammeLearners._c.k===k)return getProgrammeLearners._c.v;
   const progEnrolments=activeProgramme?enrolments.filter(e=>String(e.programme_id)===String(activeProgramme.id)):enrolments;
   const v=progEnrolments.length===0?[]:learners.filter(l=>new Set(progEnrolments.map(e=>e.learner_id)).has(l.id));
-  getProgrammeLearners._c={k,v};
+a  getProgrammeLearners._c={k,v};
   return v;
 }
+
+// ── Bulk paste "Download Template" helpers ──
+// PMs often have nothing to paste yet — these give them a starting point:
+// a CSV pre-filled with every enrolled learner's ID number (and name, for
+// reference) in the exact column order the matching paste box expects, so
+// they can fill in results/attendance offline in Excel and paste the whole
+// thing back in.
+function _downloadCSV(filename,rows){
+  const escCell=v=>{
+    v=String(v==null?'':v);
+    return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+  };
+  const csv=rows.map(r=>r.map(escCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function _templateFilenamePart(){
+  return(activeProgramme&&activeProgramme.programme_name||'programme').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,60)||'programme';
+}
+function downloadEisaTemplate(){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  const modNum=+document.getElementById('eisa-paste-mod').value||1;
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  const rows=[['ID Number','KM','PM','WM','Exam V1','Exam V1%','Exam V2','Exam V2%','Date','Learner (reference only — do not paste this column)']];
+  roster.forEach(l=>rows.push([l.id_number||'','','','','','','','','',`${l.first_name||''} ${l.last_name||''}`.trim()]));
+  _downloadCSV(`EISA_template_module${modNum}_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+}
+function downloadAttTemplate(){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  const existing=getAttDates();
+  const dateCols=existing.length?existing:['YYYY-MM-DD'];
+  const rows=[['ID Number',...dateCols,'Learner (reference only — do not paste this column)']];
+  roster.forEach(l=>rows.push([l.id_number||'',...dateCols.map(()=>''),`${l.first_name||''} ${l.last_name||''}`.trim()]));
+  _downloadCSV(`Attendance_template_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+}
+function downloadUsTemplate(){
+  if(!activeProgramme||!_usPasteUnits.length){toast('Open a module\'s Bulk Paste first','warn');return;}
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  const headerCols=['ID Number',..._usPasteUnits.flatMap(u=>[`${u.id}-F`,`${u.id}-S`]),'Logbook','Learner (reference only — do not paste this column)'];
+  const rows=[headerCols];
+  roster.forEach(l=>{
+    const blanks=headerCols.slice(1,-1).map(()=>'');
+    rows.push([l.id_number||'',...blanks,`${l.first_name||''} ${l.last_name||''}`.trim()]);
+  });
+  _downloadCSV(`UnitStandards_module${_usPasteModNum}_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+}
+
 function getAttDates(){
   const dates=new Set();
   Object.values(attState).forEach(d=>Object.keys(d).forEach(k=>dates.add(normDateKey(k))));
@@ -13485,7 +13544,7 @@ async function runExportWithFilter(){
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk EISA Entry</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file.</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file. Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent) · <span style="font-family:var(--mono);color:var(--gold2)">N/A</span>.</div>
       </div>
       <button onclick="closeEisaPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
     </div>
@@ -13500,6 +13559,9 @@ async function runExportWithFilter(){
             <option value="3">Module 3</option>
             <option value="4">Module 4</option>
           </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="downloadEisaTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers for the selected module">⬇ Download Template</button>
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:5px">
           <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
@@ -13535,6 +13597,9 @@ async function runExportWithFilter(){
     <!-- Paste area -->
     <div style="padding:20px 24px 0;flex-shrink:0">
       <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <div style="margin:4px 0 6px">
+        <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:8pt;white-space:nowrap" onclick="downloadAttTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers and current session dates">⬇ Download Template</button>
+      </div>
       <textarea id="att-paste-area" rows="4" placeholder="ID Number&#9;2026-03-03&#9;2026-03-05&#9;2026-03-10&#10;9001234567890&#9;P&#9;P&#9;A&#10;8905123456789&#9;A&#9;P&#9;P" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseAttPaste()"></textarea>
     </div>
     <!-- Preview table -->
@@ -13601,13 +13666,16 @@ document.getElementById('bulk-dates-modal').addEventListener('click',function(e)
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div id="us-paste-title" style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Unit Standards Paste</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file):</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file). Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent).</div>
         <div id="us-paste-template" style="font-family:var(--mono);font-size:7.5pt;color:var(--gold2);background:rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;margin-top:6px;user-select:all;overflow-x:auto;white-space:nowrap"></div>
       </div>
       <button onclick="closeUsPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
     </div>
     <div style="padding:16px 24px 0;flex-shrink:0">
       <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <div style="margin:4px 0 6px">
+        <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:8pt;white-space:nowrap" onclick="downloadUsTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers for this module">⬇ Download Template</button>
+      </div>
       <textarea id="us-paste-area" rows="4" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseUsPaste()"></textarea>
     </div>
     <div id="us-paste-preview" style="flex:1;overflow:auto;padding:14px 24px 20px;min-height:100px">
@@ -13728,7 +13796,7 @@ function parseUsPaste(){
     let learner=lMap[idNum];
     if(!learner&&idNum){const nk=normName(idNum);if(nk&&nameMap[nk]&&!nameDupes.has(nk))learner=nameMap[nk];}
     const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
-    const cells=validCols.map(c=>({...c,value:_usNormResult(cols[c.col])}));
+    const cells=validCols.map(c=>{const raw=(cols[c.col]||'').trim();const value=_usNormResult(cols[c.col]);return{...c,value,invalid:!!raw&&!value};});
     return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
   });
 
@@ -13746,8 +13814,10 @@ function parseUsPaste(){
     ${validCols.map(c=>`<th style="text-align:center;padding:8px 6px;font-size:7pt;letter-spacing:.04em;color:rgba(255,255,255,.4);font-weight:700;white-space:nowrap">${esc(_usColLabel(c))}</th>`).join('')}
   </tr>`;
   const bodyRows=_usPasteRows.map(r=>{
+    const invalidCells=r.cells.filter(c=>c.invalid);
+    const invalidNote=invalidCells.length?` <span style="color:#f87171;font-weight:700" title="${esc(invalidCells.map(c=>_usColLabel(c)).join(', '))}">⚠ ${invalidCells.length} unrecognised</span>`:'';
     const matchCell=(r.learner&&!r.unmatchReason)
-      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}${invalidNote}</td>`
       :`<td style="color:#f87171;font-size:8pt;padding:7px 10px;white-space:nowrap">⚠ ${esc(r.unmatchReason)}</td>`;
     return`<tr style="border-bottom:1px solid rgba(255,255,255,.07)">
       <td style="font-family:var(--mono);font-size:8pt;color:rgba(255,255,255,.7);padding:7px 10px">${esc(r.idNum)}</td>
@@ -13761,7 +13831,9 @@ function parseUsPaste(){
 
   const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
   const colNote=skippedCols?` · ${skippedCols} column${skippedCols!==1?'s':''} skipped (not recognised)`:'';
-  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} column${validCols.length!==1?'s':''}${colNote}`;
+  const invalidTotal=_usPasteRows.reduce((n,r)=>n+r.cells.filter(c=>c.invalid).length,0);
+  const invalidNote=invalidTotal?` · <span style="color:#f87171;font-weight:700">${invalidTotal} unrecognised code${invalidTotal!==1?'s':''} ignored — valid codes are C / NYC</span>`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} column${validCols.length!==1?'s':''}${colNote}${invalidNote}`;
   commit.disabled=matched===0;
 }
 
@@ -13901,7 +13973,14 @@ function parseEisaPaste(){
     const examv2_pct=normPct(cols[7]);
     const date=(cols[8]||'').trim();
     const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
-    _eisaPasteRows.push({idNum,learner,km,pm,wm,examv1,examv1_pct,examv2,examv2_pct,date,modNum,rowIdx:i+startIdx+1,unmatchReason});
+    // Flag cells where the PM typed *something* (e.g. "Y"/"N") that isn't a
+    // recognised result code — these were silently dropped before, which
+    // looked identical to leaving the cell blank. Surface them instead.
+    const invalidCols=[];
+    [['KM',1,km],['PM',2,pm],['WM',3,wm],['Exam V1',4,examv1],['Exam V2',6,examv2]].forEach(([label,ci,norm])=>{
+      if((cols[ci]||'').trim()&&!norm)invalidCols.push({label,raw:(cols[ci]||'').trim()});
+    });
+    _eisaPasteRows.push({idNum,learner,km,pm,wm,examv1,examv1_pct,examv2,examv2_pct,date,modNum,rowIdx:i+startIdx+1,unmatchReason,invalidCols});
   });
 
   const matched=_eisaPasteRows.filter(r=>r.learner&&!r.unmatchReason).length;
@@ -13914,8 +13993,9 @@ function parseEisaPaste(){
   const badgeResult=v=>v==='C'?`<span style="background:#1B7A4A;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">C</span>`:v==='NYC'?`<span style="background:#CC6B00;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">NYC</span>`:v==='N/A'?`<span style="background:#666;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">N/A</span>`:v?`<span style="color:rgba(255,255,255,.4)">${v}</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
 
   const rows=_eisaPasteRows.map(r=>{
+    const invalidNote=r.invalidCols&&r.invalidCols.length?` <span style="color:#f87171;font-weight:700" title="${esc(r.invalidCols.map(c=>c.label+': "'+c.raw+'"').join(', '))}">⚠ ${r.invalidCols.length} unrecognised code${r.invalidCols.length!==1?'s':''}</span>`:'';
     const matchCell=(r.learner&&!r.unmatchReason)
-      ?`<td style="color:#4ade80;font-size:8pt">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      ?`<td style="color:#4ade80;font-size:8pt">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}${invalidNote}</td>`
       :`<td style="color:#f87171;font-size:8pt">⚠ ${esc(r.unmatchReason)}</td>`;
     const examCell=r.examv1?(r.examv1_pct?`${badgeResult(r.examv1)} <span style="color:rgba(255,255,255,.5);font-size:7.5pt">${r.examv1_pct}%</span>`:badgeResult(r.examv1)):badgeResult('');
     const exam2Cell=r.examv2?(r.examv2_pct?`${badgeResult(r.examv2)} <span style="color:rgba(255,255,255,.5);font-size:7.5pt">${r.examv2_pct}%</span>`:badgeResult(r.examv2)):badgeResult('');
@@ -13946,7 +14026,9 @@ function parseEisaPaste(){
   </table>`;
 
   const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
-  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${_eisaPasteRows.length} rows total`;
+  const invalidCount=_eisaPasteRows.reduce((n,r)=>n+(r.invalidCols?r.invalidCols.length:0),0);
+  const invalidNote=invalidCount?` · <span style="color:#f87171;font-weight:700">${invalidCount} unrecognised code${invalidCount!==1?'s':''} ignored — valid codes are C / NYC / N/A</span>`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${_eisaPasteRows.length} rows total${invalidNote}`;
   commit.disabled=matched===0;
 }
 
