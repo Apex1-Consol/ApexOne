@@ -5093,6 +5093,15 @@ function addAttDate(){
 // pattern, instead of clicking ＋ Add Date once per session. Values start
 // blank, same as a single Add Date — this only creates the columns; actual
 // P/A/N/A/R entry still happens on the grid (or via Bulk Attendance paste).
+//
+// NOTE: always format the range/loop dates from LOCAL date components
+// (_fmtLocalDate), never Date#toISOString() -- toISOString() converts to
+// UTC first, which silently shifts the date back a day in any timezone
+// ahead of UTC (e.g. SAST, UTC+2). That caused a real off-by-one bug here.
+function _fmtLocalDate(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return`${y}-${m}-${day}`;
+}
 function openBulkDatesModal(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
   const modal=document.getElementById('bulk-dates-modal');
@@ -5101,8 +5110,8 @@ function openBulkDatesModal(){
   const today=new Date();
   const first=new Date(today.getFullYear(),today.getMonth(),1);
   const last=new Date(today.getFullYear(),today.getMonth()+1,0);
-  document.getElementById('bulk-dates-from').value=first.toISOString().slice(0,10);
-  document.getElementById('bulk-dates-to').value=last.toISOString().slice(0,10);
+  document.getElementById('bulk-dates-from').value=_fmtLocalDate(first);
+  document.getElementById('bulk-dates-to').value=_fmtLocalDate(last);
   [1,2,3,4,5].forEach(d=>{const el=document.getElementById('bulk-dates-dow-'+d);if(el)el.checked=true;});
   [0,6].forEach(d=>{const el=document.getElementById('bulk-dates-dow-'+d);if(el)el.checked=false;});
   modal.style.display='flex';
@@ -5125,7 +5134,7 @@ function _bulkDatesCompute(){
   const cur=new Date(from);
   let guard=0; // hard stop against an accidental multi-year range
   while(cur<=to&&guard<1000){
-    if(dows.has(cur.getDay()))out.push(cur.toISOString().slice(0,10));
+    if(dows.has(cur.getDay()))out.push(_fmtLocalDate(cur));
     cur.setDate(cur.getDate()+1);
     guard++;
   }
