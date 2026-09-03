@@ -3766,7 +3766,7 @@ function getProgrammeLearners(){
   if(getProgrammeLearners._c&&getProgrammeLearners._c.k===k)return getProgrammeLearners._c.v;
   const progEnrolments=activeProgramme?enrolments.filter(e=>String(e.programme_id)===String(activeProgramme.id)):enrolments;
   const v=progEnrolments.length===0?[]:learners.filter(l=>new Set(progEnrolments.map(e=>e.learner_id)).has(l.id));
-a  getProgrammeLearners._c={k,v};
+  getProgrammeLearners._c={k,v};
   return v;
 }
 
