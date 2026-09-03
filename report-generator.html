@@ -3417,7 +3417,7 @@ async function onProgrammeChange(){
         `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`
       );
       // Unpack: enrolments array with nested learner object
-      enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status}));
+      enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
       learners=enrolled.map(e=>e.learner).filter(Boolean);
 
       const [att,ei,lc]=await Promise.all([
@@ -3547,8 +3547,11 @@ function saveNarratives(showToast=false){
   // Start from the in-memory narratives store so fields accepted while their
   // textarea wasn't mounted in the DOM (e.g. via the Draft-all wizard) are
   // still persisted, then let any live DOM values override with the freshest edits.
-  DA_KEYS.forEach(k=>{if(narratives[k]!==undefined)data[k]=narratives[k];});
+  daKeys().forEach(k=>{if(narratives[k]!==undefined)data[k]=narratives[k];});
   document.querySelectorAll('[data-nar]').forEach(el=>{data[el.dataset.nar]=el.value;});
+  // "No classes held this month" flag (see setNoClasses/buildAttendanceRegisterPage) —
+  // not a daKeys() field or a [data-nar] textarea, so it needs its own persist line.
+  if(narratives.no_classes!==undefined)data.no_classes=narratives.no_classes===true||narratives.no_classes==='true';
   // survey
   const sv={};
   // Only record the checked element per question (store column name, not boolean)
@@ -3755,6 +3758,48 @@ function _throttle(fn,ms){
   };
 }
 function getAssessor(id){return assessors.find(a=>a.id===id)?.full_name||'—';}
+// ── Learner termination status ──────────────────────────────────────────────
+// Tracked on the enrolment row (per-programme, so a learner terminated on one
+// programme can still be active on another): status ('active'|'terminated')
+// plus, when terminated, which module they left in (enrolments.fields.
+// terminated_module). Works the same for QCTO/occupational and Legacy quals —
+// it's a property of the enrolment, not of the qualification type.
+function _findEnrolment(learnerId){
+  if(!activeProgramme)return null;
+  return enrolments.find(e=>String(e.learner_id)===String(learnerId)&&String(e.programme_id)===String(activeProgramme.id))||null;
+}
+function isLearnerTerminated(learnerId){
+  const e=_findEnrolment(learnerId);
+  return!!e&&e.status==='terminated';
+}
+function getLearnerTerminatedModule(learnerId){
+  const e=_findEnrolment(learnerId);
+  const m=e&&e.fields&&e.fields.terminated_module;
+  return m?+m:null;
+}
+async function setLearnerTermination(learnerId,terminated,moduleNum){
+  const e=_findEnrolment(learnerId);
+  if(!e)return;
+  e.status=terminated?'terminated':'active';
+  e.fields={...(e.fields||{})};
+  if(terminated)e.fields.terminated_module=moduleNum?+moduleNum:null;
+  else delete e.fields.terminated_module;
+  const payload={status:e.status,fields:e.fields};
+  if(isOnline&&!isTempId(e.id)){
+    try{await sbPatch('enrolments',e.id,payload);showSaved();}
+    catch(err){
+      console.warn('Learner status patch failed:',err?.message);
+      enqueueWrite('patch','enrolments',payload,e.id);
+      updateQueueBadge();
+      toast('Change queued for retry when online','warn');
+      showSaved();
+    }
+  } else if(isOnline){showSaved();}
+  else{toast('Offline — change queued for sync','info',3000);}
+  _lastGenKey=null;
+  generateReport(true);
+  updateProgressPanel();
+}
 function getProgrammeLearners(){
   // learners is already scoped to the selected programme via join fetch in the normal
   // switch-programme flow — but after a multi-programme import, `learners` and `enrolments`
@@ -3815,10 +3860,10 @@ function downloadAttTemplate(){
   toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
 }
 function downloadUsTemplate(){
-  if(!activeProgramme||!_usPasteUnits.length){toast('Open a module\'s Bulk Paste first','warn');return;}
+  if(!activeProgramme||!_usPasteModNum){toast('Open a module\'s Bulk Paste first','warn');return;}
   const roster=getProgrammeLearners();
   if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
-  const headerCols=['ID Number',..._usPasteUnits.flatMap(u=>[`${u.id}-F`,`${u.id}-S`]),'Logbook','Learner (reference only — do not paste this column)'];
+  const headerCols=['ID Number','Formative','Summative','Logbook','Learner (reference only — do not paste this column)'];
   const rows=[headerCols];
   roster.forEach(l=>{
     const blanks=headerCols.slice(1,-1).map(()=>'');
@@ -4173,21 +4218,14 @@ function computeCoverStats(pLearners,prog){
   let flagged=0;
   const legacy=isLegacyProgramme(prog);
   if(legacy){
-    // Legacy: a "module" (unit-standard grouping) is flagged if any learner has
-    // been marked Not Yet Achieved on any unit standard within that group.
-    const unitsByMod={};
-    unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).forEach(u=>{
-      const m=u.mod||1;
-      (unitsByMod[m]=unitsByMod[m]||[]).push(u);
-    });
+    // Legacy: a module is flagged if any learner has been marked Not Yet on
+    // that module's Formative or Summative assessment (tracked per module,
+    // not per unit standard — see legacyFormativeValue/legacySummativeValue).
     modNums.forEach(m=>{
-      const units=unitsByMod[m]||[];
       let anyNYC=false;
       pLearners.forEach(l=>{
-        units.forEach(u=>{
-          const ov=narratives._eisa||{};
-          if(ov[usFormativeKey(l.id,u.id)]==='NYC'||ov[usSummativeKey(l.id,u.id)]==='NYC')anyNYC=true;
-        });
+        const ov=narratives._eisa||{};
+        if(legacyFormativeValue(ov,l.id,m)==='NYC'||legacySummativeValue(ov,l.id,m)==='NYC')anyNYC=true;
       });
       if(anyNYC)flagged++;
     });
@@ -4311,8 +4349,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   });
   const totalFlags=highRiskCount+medRiskCount+belowThresholdCount;
   // Module timeline — reuses modStatus()/MOD_STATUS_STYLE already used on the Overview page.
-  const fieldMap=moduleFieldMap(allModuleNums(activeProgramme));
-  const timelineMods=allModuleNums(activeProgramme).map(n=>{
+  const fieldMap=moduleFieldMap(displayModuleNums(activeProgramme));
+  const timelineMods=displayModuleNums(activeProgramme).map(n=>{
     const dates=activeProgramme[fieldMap[n]]||'';
     const st=dates?modStatus(dates):null;
     return{n,dates,status:st};
@@ -4321,7 +4359,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const CIRC=2*Math.PI*50;
   function arcSeg(offset,count,total){return total>0?(count/total*CIRC):0;}
   let flaggedModules=0;
-  allModuleNums(activeProgramme).forEach(m=>{
+  displayModuleNums(activeProgramme).forEach(m=>{
     let anyNYC=false;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
@@ -4343,17 +4381,20 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   let usEarnedCredits=0,usTotalCredits=0,usPct=null;
   if(legacy){
     // ── Unit standards credit progress ──
-    // Achieved = Formative AND Summative both 'C' for that learner+unit
-    // (same rule as buildLegacyAssessmentPages' per-module credit total).
+    // Achieved = Formative AND Summative both 'C' for that learner+module
+    // (tracked per module, not per unit standard — same rule as
+    // buildLegacyAssessmentPages' per-module credit total).
     const legacyUnits=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
     const ov=narratives._eisa||{};
+    const creditsByMod={};
+    legacyUnits.forEach(u=>{const m=u.mod||1;creditsByMod[m]=(creditsByMod[m]||0)+(+u.credits||0);});
     const perLearnerCredits=legacyUnits.reduce((s,u)=>s+(+u.credits||0),0);
     usTotalCredits=perLearnerCredits*nCount;
     pLearners.forEach(l=>{
-      legacyUnits.forEach(u=>{
-        const fv=ov[usFormativeKey(l.id,u.id)]||'';
-        const sv=ov[usSummativeKey(l.id,u.id)]||'';
-        if(fv==='C'&&sv==='C')usEarnedCredits+=(+u.credits||0);
+      Object.keys(creditsByMod).forEach(m=>{
+        const fv=legacyFormativeValue(ov,l.id,m)||'';
+        const sv=legacySummativeValue(ov,l.id,m)||'';
+        if(fv==='C'&&sv==='C')usEarnedCredits+=creditsByMod[m];
       });
     });
     usPct=usTotalCredits>0?Math.round(usEarnedCredits/usTotalCredits*100):null;
@@ -4511,6 +4552,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
           </div>`}
         </div>
       </div>
+      ${buildLearnerStatusBlock(pLearners,p)}
       <div class="exec-headline" style="margin-top:20px;padding:18px 22px;background:linear-gradient(90deg,${p.gradFrom}12,transparent);border-left:4px solid ${p.accentFrom};border-radius:0 8px 8px 0">
         <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:6px">Headline</div>
         <div style="font-size:10pt;color:#333;line-height:1.6">${esc(headline)}</div>
@@ -4614,6 +4656,51 @@ function buildCohortSummary(pLearners){
   </div>`;
 }
 
+// ── Learner Status block (Executive Summary) ──────────────────────────────
+// Shows Enrolled / Active / Terminated counts and, on screen, an editable
+// per-learner status control (Active, or Terminated + which module) — see
+// isLearnerTerminated/setLearnerTermination. Works for QCTO and Legacy quals
+// alike since it's driven off the enrolment record, not qualification type.
+function buildLearnerStatusBlock(pLearners,p){
+  const modNums=activeProgramme?displayModuleNums(activeProgramme):[1,2,3,4];
+  const terminated=pLearners.filter(l=>isLearnerTerminated(l.id));
+  const active=pLearners.filter(l=>!isLearnerTerminated(l.id));
+  const rows=[...pLearners].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).map(l=>{
+    const isTerm=isLearnerTerminated(l.id);
+    const termMod=getLearnerTerminatedModule(l.id);
+    const modOptions=modNums.map(n=>`<option value="${n}" ${termMod===n?'selected':''}>Module ${n}</option>`).join('');
+    return`<div class="no-print" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F1F5F9">
+      <span style="flex:1;font-size:9pt;color:#1E2533">${esc(l.first_name)} ${esc(l.last_name)}</span>
+      <select style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},this.value==='terminated',document.getElementById('term-mod-${l.id}')?document.getElementById('term-mod-${l.id}').value:null);_lsRefreshModSelect(this)">
+        <option value="active" ${!isTerm?'selected':''}>Active</option>
+        <option value="terminated" ${isTerm?'selected':''}>Terminated</option>
+      </select>
+      <select id="term-mod-${l.id}" style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px;${isTerm?'':'visibility:hidden'}" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},true,this.value)">
+        ${modOptions}
+      </select>
+    </div>`;
+  }).join('');
+  const termNames=terminated.map(l=>{
+    const m=getLearnerTerminatedModule(l.id);
+    return`${esc(l.first_name)} ${esc(l.last_name)}${m?` (Module ${m})`:''}`;
+  }).join(', ');
+  return`<div class="exec-learner-status" style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Enrolled</label><div class="cs-big">${pLearners.length}</div></div>
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Active</label><div class="cs-big">${active.length}</div></div>
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Terminated</label><div class="cs-big">${terminated.length}</div></div>
+    </div>
+    <div style="font-size:9pt;color:#4A5568;margin-bottom:8px">${terminated.length?`Terminated: ${termNames}.`:'No learners terminated this period.'}</div>
+    <div class="no-print" style="font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Learner Status <span style="font-weight:400;text-transform:none;letter-spacing:normal;color:#B5BEC9">(screen only — editable)</span></div>
+    <div class="no-print" style="max-height:220px;overflow-y:auto">${rows}</div>
+  </div>`;
+}
+function _lsRefreshModSelect(sel){
+  const row=sel.closest('div');
+  const modSel=row?row.querySelector('select[id^="term-mod-"]'):null;
+  if(modSel)modSel.style.visibility=sel.value==='terminated'?'visible':'hidden';
+}
+
 function hexMix(a,b,t){
   const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
   const ar=(pa>>16)&255,ag=(pa>>8)&255,ab=pa&255;
@@ -4627,9 +4714,16 @@ function modStatus(datesStr){
     const parts=datesStr.split(/[–-]/).map(s=>s.trim()).filter(Boolean);
     if(parts.length<2) return null;
     let startStr=parts[0],endStr=parts[parts.length-1];
-    const yearMatch=endStr.match(/\d{4}/);
+    // Year token off the end date's trailing digits — accepts a full 4-digit
+    // year ("29 Jun 2026") and also the 2-digit shorthand PMs often type
+    // ("29 Jun 26"). The old regex only matched \d{4}, so a 2-digit year
+    // silently failed to parse and the module's status fell back to "—"
+    // even when the module's facilitation was clearly long done.
+    const yearMatch=endStr.match(/(\d{4}|\d{2})\s*$/);
     if(!yearMatch) return null;
-    if(!/\d{4}/.test(startStr)) startStr+=' '+yearMatch[0];
+    const fullYear=yearMatch[1].length===2?('20'+yearMatch[1]):yearMatch[1];
+    endStr=endStr.replace(/(\d{4}|\d{2})\s*$/,fullYear);
+    if(!/\d{4}\s*$/.test(startStr)) startStr+=' '+fullYear;
     const start=new Date(startStr),end=new Date(endStr);
     if(isNaN(start)||isNaN(end)) return null;
     const now=new Date();
@@ -4652,17 +4746,12 @@ function getLearnerRiskLabel(l){
     if(!units.length)return'Unknown';
     let nyc=0,total=0;
     const ov=narratives._eisa||{};
-    units.forEach(u=>{
-      [usFormativeKey(l.id,u.id),usSummativeKey(l.id,u.id)].forEach(k=>{
-        const v=ov[k];
+    // Formative/Summative/Logbook are tracked per module now, not per unit
+    // standard (see legacyFormativeValue/legacySummativeValue/legacyLogbookValue).
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
         if(v){total++;if(v==='NYC')nyc++;}
       });
-    });
-    // One logbook mark per module now (see legacyLogbookValue) — count each
-    // module's logbook as its own signal, same as before but per module.
-    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
-      const lbv=legacyLogbookValue(ov,l.id,modNum);
-      if(lbv){total++;if(lbv==='NYC')nyc++;}
     });
     if(!total)return'Unknown';
     const pct=nyc/total;
@@ -4671,7 +4760,7 @@ function getLearnerRiskLabel(l){
   const res=eisaState[l.id]||{};
   if(!Object.keys(res).length)return'Unknown';
   let nyc=0,total=0;
-  allModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+  displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
   if(!total)return'Unknown';
   const pct=nyc/total;
   return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -4699,21 +4788,16 @@ function computeQctoModuleProgress(modNums,pLearners){
 // (Legacy only) — units grouped by u.mod, same grouping used by the
 // flagging logic above and by buildLegacyAssessmentPages.
 function computeLegacyModuleProgress(modNums,prog,pLearners){
+  // Formative/Summative are tracked once per learner per module (see
+  // legacyFormativeValue/legacySummativeValue), not per unit standard — so
+  // "total" here is one mark per learner, not per learner×unit-standard.
   const ov=narratives._eisa||{};
-  const unitsByMod={};
-  unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).forEach(u=>{
-    const m=u.mod||1;(unitsByMod[m]=unitsByMod[m]||[]).push(u);
-  });
   const out={};
   modNums.forEach(m=>{
-    const units=unitsByMod[m]||[];
-    let fDone=0,sDone=0,total=0;
+    let fDone=0,sDone=0,total=pLearners.length;
     pLearners.forEach(l=>{
-      units.forEach(u=>{
-        total++;
-        if(ov[usFormativeKey(l.id,u.id)]==='C')fDone++;
-        if(ov[usSummativeKey(l.id,u.id)]==='C')sDone++;
-      });
+      if(legacyFormativeValue(ov,l.id,m)==='C')fDone++;
+      if(legacySummativeValue(ov,l.id,m)==='C')sDone++;
     });
     out[m]={fDone,sDone,total};
   });
@@ -4815,8 +4899,10 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
   // Only one Module N feedback block per module this programme actually
   // runs (modNums already excludes anything in excluded_modules — see
   // displayModuleNums) — a deleted/not-applicable module no longer gets a
-  // permanently-empty "Module 4" box on the client-facing report.
-  modNums.filter(n=>n<=4).forEach(n=>{
+  // permanently-empty "Module 4" box on the client-facing report. No cap at
+  // 4 — a programme with 5+ modules (e.g. a 5-module Legacy qual) gets a
+  // feedback box for every module it actually runs.
+  modNums.forEach(n=>{
     const key=`feedback_m${n}`;
     const modCls=`m${n}`;
     const label=`Module ${n}`;
@@ -4876,7 +4962,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     if(isLegacyProgramme(activeProgramme))return getLegacyRiskLabel(l);
     if(!hasAny)return'Unknown';
     let nyc=0,total=0;
-    allModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+    displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
     if(!total)return'Unknown';
     const pct=nyc/total;
     return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -4887,15 +4973,11 @@ function buildParticipationPage(pLearners,nar,pn=3){
     if(!units.length)return'Unknown';
     let nyc=0,total=0;
     const ov=nar._eisa||{};
-    units.forEach(u=>{
-      [usFormativeKey(l.id,u.id),usSummativeKey(l.id,u.id)].forEach(k=>{
-        const v=ov[k];
+    // Formative/Summative/Logbook are tracked once per learner per module.
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
         if(v){total++;if(v==='NYC')nyc++;}
       });
-    });
-    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
-      const lbv=legacyLogbookValue(ov,l.id,modNum);
-      if(lbv){total++;if(lbv==='NYC')nyc++;}
     });
     if(!total)return'Unknown';
     const pct=nyc/total;
@@ -4943,15 +5025,17 @@ function buildParticipationPage(pLearners,nar,pn=3){
       const units=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===activeProgramme.saqa_id);
       const totalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
       if(!totalCredits)return false;
-      const earned=units.reduce((s,u)=>{
-        const ov=nar._eisa||{};
-        const fv=ov[usFormativeKey(l.id,u.id)],sv=ov[usSummativeKey(l.id,u.id)];
-        return s+(fv==='C'&&sv==='C'?(+u.credits||0):0);
+      const ov=nar._eisa||{};
+      const creditsByMod={};
+      units.forEach(u=>{const m=u.mod||1;creditsByMod[m]=(creditsByMod[m]||0)+(+u.credits||0);});
+      const earned=Object.keys(creditsByMod).reduce((s,m)=>{
+        const fv=legacyFormativeValue(ov,l.id,m),sv=legacySummativeValue(ov,l.id,m);
+        return s+(fv==='C'&&sv==='C'?creditsByMod[m]:0);
       },0);
       return earned/totalCredits>=0.5;
     }
     const res=eisaState[l.id]||{};
-    return allModuleNums(activeProgramme).some(m=>(res[m]||{}).wm==='C');
+    return displayModuleNums(activeProgramme).some(m=>(res[m]||{}).wm==='C');
   }
   const satLearners=pLearners.filter(learnerIsCompetent);
   const remLearners=pLearners.filter(l=>!learnerIsCompetent(l));
@@ -5049,7 +5133,19 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
   },0);
   const warnBadge=warnCount>0&&dates.length>0
     ?`<span class="att-warn-count no-print" title="Learners below ${ATT_THRESHOLD}% threshold">${warnCount} below ${ATT_THRESHOLD}%</span>`:'';
-  const emptyHint=dates.length===0?`<div style="font-size:8.5pt;color:var(--muted);padding:16px 0;font-style:italic">No session dates yet — use ＋ Add Date to add columns.</div>`:'';
+  // "No classes held" note — lets a PM explain a month with zero session dates
+  // (e.g. a planned break) instead of the report just looking like missing
+  // data, and satisfies the Attendance checklist item so Send for Review /
+  // Print aren't blocked over a month that genuinely had no facilitation.
+  const noClasses=narratives.no_classes===true||narratives.no_classes==='true';
+  const noClassesToggle=`<label class="no-print" style="display:flex;align-items:center;gap:6px;font-size:8pt;color:var(--muted);margin:2px 0 10px;cursor:pointer">
+      <input type="checkbox" ${noClasses?'checked':''} onchange="setNoClasses(this.checked)"> No classes were held this month
+    </label>`;
+  const emptyHint=dates.length===0
+    ?(noClasses
+      ?`<div style="font-size:8.5pt;color:var(--body);padding:16px 0;font-style:italic">No classes were held during this reporting period.</div>`
+      :`<div style="font-size:8.5pt;color:var(--muted);padding:16px 0;font-style:italic">No session dates yet — use ＋ Add Date to add columns.</div>`)
+    :'';
 
   const body=`
     <div class="sec-header">
@@ -5059,6 +5155,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
         <div class="sec-subtitle">Click any cell to cycle: P → A → N/A → R · Right-click for bulk options</div>
       </div>
     </div>
+    ${noClassesToggle}
     ${emptyHint}
     ${dates.length>0?`<div style="overflow-x:auto">
       <table class="data-table" id="att-table">
@@ -5336,14 +5433,14 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
 function usKey(learnerId,usCode){
   return`${learnerId}_us_${String(usCode).replace(/[^a-zA-Z0-9]/g,'')}`;
 }
-// Legacy quals track Formative + Summative per unit standard (credits require
-// both), plus a Logbook mark per learner PER MODULE (each module's assessment
-// page is printed separately with its own logbook section — see
-// buildLegacyAssessmentPages). Logbook used to be tracked once per learner for
-// the whole qualification; logbookKey(learnerId) with no module number still
-// returns that old key so already-saved values aren't lost, and
-// legacyLogbookValue() below carries that old value forward as the starting
-// point for every module until a module's logbook is set individually.
+// Legacy quals track Formative, Summative and Logbook once per learner PER
+// MODULE — not per unit standard. Unit standards for a module are still
+// listed (read-only, for reference/POE purposes) but no longer need their
+// own Achieved/Not Yet entry; PMs mark the whole module's Formative/
+// Summative/Logbook instead, which is what actually drives credit/status.
+// usFormativeKey/usSummativeKey are kept only so any already-saved
+// per-unit-standard values aren't silently lost — they're no longer written
+// by the UI, but old drafts/exports that still reference them keep working.
 function usFormativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_formative';}
 function usSummativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_summative';}
 function logbookKey(learnerId,modNum){return modNum!=null?`${learnerId}_m${modNum}_logbook`:`${learnerId}_logbook`;}
@@ -5352,6 +5449,10 @@ function legacyLogbookValue(ov,learnerId,modNum){
   if(perModule!==undefined)return perModule;
   return(ov||{})[logbookKey(learnerId)]||''; // pre-migration single value, carried forward
 }
+function legacyFormativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_formative`;}
+function legacySummativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_summative`;}
+function legacyFormativeValue(ov,learnerId,modNum){return(ov||{})[legacyFormativeKey(learnerId,modNum)]||'';}
+function legacySummativeValue(ov,learnerId,modNum){return(ov||{})[legacySummativeKey(learnerId,modNum)]||'';}
 function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   const allUnits=unitStandards
     .filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id)
@@ -5378,10 +5479,10 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     grp.units.push(u);
   });
 
-  const mkFsCell=(key,val,uscode,credits,role)=>{
+  const mkFsCell=(key,val,cls)=>{
     const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
     const label=val==='C'?'Achieved':val==='NYC'?'Not Yet':'&#8212;';
-    return`<td style="text-align:center"><div><select class="result-select result-screen legacy-us-select" data-eisa="${key}" data-uscode="${esc(String(uscode))}" data-credits="${credits}" data-role="${role}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
+    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
   };
 
   let pn=startPn;
@@ -5389,6 +5490,12 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   modGroups.forEach(grp=>{
     const modNum=grp.mod,units=grp.units;
     const modTotalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
+    // Reference list of the unit standards this module actually covers —
+    // read-only (title/level/credits), for POE/audit reference. Results are
+    // no longer captured per unit standard; see below.
+    const usListRows=units.map(u=>`<tr><td style="font-family:var(--mono);white-space:nowrap">${esc(u.id)}</td><td>${esc(u.title||'')}</td><td style="text-align:center">${esc(String(u.level||''))}</td><td style="text-align:center">${esc(String(u.credits||0))}</td></tr>`).join('');
+    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
+
     const chunks=[];
     for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
     if(!chunks.length)chunks.push([]);
@@ -5396,17 +5503,12 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     chunks.forEach((chunk,pageIdx)=>{
       const tableId=`legacy-us-table-m${modNum}-${pageIdx}`;
       const rows=chunk.map(l=>{
-        let earned=0;
-        let anyAssessed=false;
-        const unitCells=units.map(u=>{
-          const fKey=usFormativeKey(l.id,u.id),sKey=usSummativeKey(l.id,u.id);
-          const fv=(nar._eisa||{})[fKey]||'';
-          const sv=(nar._eisa||{})[sKey]||'';
-          const cr=+u.credits||0;
-          if(fv==='C'&&sv==='C')earned+=cr;
-          if(fv||sv)anyAssessed=true;
-          return mkFsCell(fKey,fv,u.id,cr,'formative')+mkFsCell(sKey,sv,u.id,cr,'summative');
-        }).join('');
+        const fKey=legacyFormativeKey(l.id,modNum),sKey=legacySummativeKey(l.id,modNum);
+        const fv=legacyFormativeValue(nar._eisa,l.id,modNum);
+        const sv=legacySummativeValue(nar._eisa,l.id,modNum);
+        const earned=(fv==='C'&&sv==='C')?modTotalCredits:0;
+        const anyAssessed=!!(fv||sv);
+        const fsCells=mkFsCell(fKey,fv,'legacy-formative-select')+mkFsCell(sKey,sv,'legacy-summative-select');
         const lbKey=logbookKey(l.id,modNum);
         const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
         const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
@@ -5415,13 +5517,10 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
         const anyProgress=earned>0||lbVal==='C'||anyAssessed;
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
-        return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${unitCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
+        return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
-      const usHeaderRow=units.map(u=>`<th colspan="2" style="text-align:center;font-size:7pt" title="${esc(u.title||'')}">${esc(u.id)}<br><span style="font-weight:400;opacity:.7">${esc(String(u.credits||0))}cr</span></th>`).join('');
-      const fsHeaderRow=units.map(()=>`<th style="text-align:center;font-size:6.5pt">F</th><th style="text-align:center;font-size:6.5pt">S</th>`).join('');
       const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
-        <tr><th rowspan="2">Learner Name</th>${usHeaderRow}<th rowspan="2">Logbook</th><th rowspan="2">Credits</th><th rowspan="2">Status</th></tr>
-        <tr>${fsHeaderRow}</tr>
+        <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
       const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
           <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
@@ -5433,10 +5532,11 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
           </span>
         </div>
+        ${usListTable}
         <div style="overflow-x:auto">
-          <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid;min-width:${360+units.length*2*42+90}px">${thead}<tbody>${rows}</tbody></table>
+          <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid">${thead}<tbody>${rows}</tbody></table>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">F = Formative &nbsp;&middot;&nbsp; S = Summative &nbsp;&middot;&nbsp; credit requires both &nbsp;&middot;&nbsp; Logbook tracked per module</span></div>`;
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
       pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
     });
   });
@@ -5458,23 +5558,17 @@ function syncUsResult(sel){
 function updateLegacyRowCredits(sel){
   const tr=sel.closest('tr');
   if(!tr)return;
-  // Group Formative/Summative selects by unit standard — a unit only earns
-  // its credit once BOTH are Achieved, so summing every select individually
-  // would double-count. Logbook is separate and gates overall completion.
-  const byUs={};
-  tr.querySelectorAll('select.legacy-us-select').forEach(s=>{
-    const code=s.dataset.uscode;
-    if(!code)return;
-    if(!byUs[code])byUs[code]={credits:+s.dataset.credits||0,f:'',s:''};
-    if(s.dataset.role==='formative')byUs[code].f=s.value;
-    else if(s.dataset.role==='summative')byUs[code].s=s.value;
-  });
-  let earned=0,total=0,anyAssessed=false;
-  Object.values(byUs).forEach(u=>{
-    total+=u.credits;
-    if(u.f==='C'&&u.s==='C')earned+=u.credits;
-    if(u.f||u.s)anyAssessed=true;
-  });
+  // Formative/Summative are now one mark each per learner for the whole
+  // module — the module's full credit total is earned only when both are
+  // Achieved (data-mod-credits carries the module's total, stashed on the
+  // row at render time since the row no longer has per-unit-standard cells
+  // to sum). Logbook is separate and gates overall completion.
+  const total=+tr.dataset.modCredits||0;
+  const fSel=tr.querySelector('select.legacy-formative-select');
+  const sSel=tr.querySelector('select.legacy-summative-select');
+  const fv=fSel?fSel.value:'',sv=sSel?sSel.value:'';
+  const earned=(fv==='C'&&sv==='C')?total:0;
+  const anyAssessed=!!(fv||sv);
   const logbookSel=tr.querySelector('select.legacy-logbook-select');
   const logbookAchieved=logbookSel&&logbookSel.value==='C';
   const credCell=tr.querySelector('.legacy-credits-cell');
@@ -5489,7 +5583,7 @@ function updateLegacyRowCredits(sel){
 function bulkSetLegacyResults(tableId,value){
   const table=document.getElementById(tableId);
   if(!table)return;
-  table.querySelectorAll('select.legacy-us-select,select.legacy-logbook-select').forEach(sel=>{
+  table.querySelectorAll('select.legacy-formative-select,select.legacy-summative-select,select.legacy-logbook-select').forEach(sel=>{
     sel.value=value;
     syncUsResult(sel);
   });
@@ -5903,6 +5997,17 @@ function toggleSurvey(el){
 function eisaChanged(el){autoSave();}
 function updateExamDisplay(el){autoSave();}
 
+// "No classes held this month" — see buildAttendanceRegisterPage note.
+function setNoClasses(checked){
+  if(!activeProgramme)return;
+  narratives.no_classes=checked;
+  autoSave();
+  toast(checked?'Noted: no classes were held this month':'Cleared "no classes" note','info',2500);
+  _lastGenKey=null;
+  generateReport(true);
+  updateProgressPanel();
+}
+
 // Dual-render sync functions
 function syncNar(ta){
   const key=ta.dataset.nar;
@@ -6091,7 +6196,7 @@ function draftNarrative(key, btn){
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
 
   // ── Per-module competency stats ──
-  const modStats=allModuleNums(activeProgramme).map(m=>{
+  const modStats=displayModuleNums(activeProgramme).map(m=>{
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
@@ -6106,7 +6211,7 @@ function draftNarrative(key, btn){
 
   // ── EISA booked/completed stats (mirrors buildExecSummaryPage) ──
   const total=pLearners.length;
-  const eisaActiveMods=allModuleNums(activeProgramme).filter(m=>{
+  const eisaActiveMods=displayModuleNums(activeProgramme).filter(m=>{
     const d=activeProgramme[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
@@ -6127,14 +6232,17 @@ function draftNarrative(key, btn){
   let draft='';
 
   if(key.startsWith('feedback_m')){
-    const idx=parseInt(key.slice(-1),10)-1;
-    const s=modStats[idx];
+    const modNum=parseInt(key.slice('feedback_m'.length),10);
+    const s=modStats.find(x=>x.m===modNum);
+    if(!s){btn.disabled=false;btn.textContent='✨ Draft from data';return;}
     const pct=Math.round(s.comp/s.total*100);
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'){
-    if(avgAtt===null){
+    if(narratives.no_classes===true||narratives.no_classes==='true'){
+      draft='No classes were held during this reporting period.';
+    } else if(avgAtt===null){
       draft='No attendance data has been recorded for this period.';
     } else {
       draft=`Cohort attendance for this period averaged ${avgAtt}% across ${attDates.length} session${attDates.length!==1?'s':''} (${total} learner${total!==1?'s':''}). `
@@ -6151,13 +6259,15 @@ function draftNarrative(key, btn){
     draft=`Learner participation has been ${compAll>total*2?'strong':'developing'} across the programme. `
          +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review.`;
   } else if(key==='eisa_summary'){
-    const pct=total>0?Math.round(eisaCompletedCount/total*100):null;
-    draft=pct===null
-      ?'No EISA data has been recorded for this period.'
-      :`${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
-       +(eisaBookedCount>eisaCompletedCount
-         ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
-         :'All booked learners have completed their EISA requirements.');
+    draft=eisaBookedCount===0
+      ?'No learners have been booked for EISA yet this period.'
+      :(()=>{
+          const pct=Math.round(eisaCompletedCount/eisaBookedCount*100);
+          return `${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
+           +(eisaBookedCount>eisaCompletedCount
+             ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
+             :'All booked learners have completed their EISA requirements.');
+        })();
   } else if(key==='concerns'){
     const concerns=[];
     if(avgAtt!==null&&avgAtt<ATT_THRESHOLD)concerns.push(`cohort attendance is below the ${ATT_THRESHOLD}% threshold (currently ${avgAtt}%)`);
@@ -6182,18 +6292,25 @@ function draftNarrative(key, btn){
 }
 
 // ── Draft-All Review Panel ────────────────────────────────────────────────────
-const DA_KEYS=['feedback_m1','feedback_m2','feedback_m3','feedback_m4','att_summary','eisa_summary','interaction','concerns','time_keeping'];
-const DA_LABELS={
-  feedback_m1:'Module 1 — Feedback',
-  feedback_m2:'Module 2 — Feedback',
-  feedback_m3:'Module 3 — Feedback',
-  feedback_m4:'Module 4 — Feedback',
-  att_summary:'Attendance Summary',
-  eisa_summary:'EISA',
-  time_keeping:'Time Keeping',
-  interaction:'Interaction & Participation',
-  concerns:'Concerns'
-};
+// Built dynamically off the active programme's real module list (via
+// displayModuleNums) so a programme with 5+ modules (e.g. a 5-module Legacy
+// qual) gets a feedback field for every module it actually runs, not just
+// the first 4. EISA is dropped for Legacy quals, matching the report body.
+function daKeys(){
+  const mods=activeProgramme?displayModuleNums(activeProgramme):[1,2,3,4];
+  const legacy=activeProgramme?isLegacyProgramme(activeProgramme):false;
+  return [...mods.map(n=>`feedback_m${n}`),'att_summary',...(legacy?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
+}
+function daLabel(key){
+  if(key.startsWith('feedback_m'))return`Module ${key.slice('feedback_m'.length)} — Feedback`;
+  return{
+    att_summary:'Attendance Summary',
+    eisa_summary:'EISA',
+    time_keeping:'Time Keeping',
+    interaction:'Interaction & Participation',
+    concerns:'Concerns'
+  }[key]||key;
+}
 
 let _daState={idx:0, drafts:{}, undoMap:{}, editMode:false};
 
@@ -6219,7 +6336,7 @@ function _computeDraft(key){
   });
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
 
-  const modStats=allModuleNums(activeProgramme).map(m=>{
+  const modStats=displayModuleNums(activeProgramme).map(m=>{
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
@@ -6233,7 +6350,7 @@ function _computeDraft(key){
   });
 
   const total=pLearners.length;
-  const eisaActiveMods=allModuleNums(activeProgramme).filter(m=>{
+  const eisaActiveMods=displayModuleNums(activeProgramme).filter(m=>{
     const d=activeProgramme[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
@@ -6252,14 +6369,17 @@ function _computeDraft(key){
   let draft='';
 
   if(key.startsWith('feedback_m')){
-    const idx=parseInt(key.slice(-1),10)-1;
-    const s=modStats[idx];
+    const modNum=parseInt(key.slice('feedback_m'.length),10);
+    const s=modStats.find(x=>x.m===modNum);
+    if(!s)return null;
     const pct=Math.round(s.comp/s.total*100);
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'){
-    if(avgAtt===null){
+    if(narratives.no_classes===true||narratives.no_classes==='true'){
+      draft='No classes were held during this reporting period.';
+    } else if(avgAtt===null){
       draft='No attendance data has been recorded for this period.';
     } else {
       draft=`Cohort attendance for this period averaged ${avgAtt}% across ${attDates.length} session${attDates.length!==1?'s':''} (${total} learner${total!==1?'s':''}). `
@@ -6271,13 +6391,15 @@ function _computeDraft(key){
              :'All learners are meeting the attendance threshold.');
     }
   } else if(key==='eisa_summary'){
-    const pct=total>0?Math.round(eisaCompletedCount/total*100):null;
-    draft=pct===null
-      ?'No EISA data has been recorded for this period.'
-      :`${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
-       +(eisaBookedCount>eisaCompletedCount
-         ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
-         :'All booked learners have completed their EISA requirements.');
+    draft=eisaBookedCount===0
+      ?'No learners have been booked for EISA yet this period.'
+      :(()=>{
+          const pct=Math.round(eisaCompletedCount/eisaBookedCount*100);
+          return `${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
+           +(eisaBookedCount>eisaCompletedCount
+             ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
+             :'All booked learners have completed their EISA requirements.');
+        })();
   } else if(key==='interaction'){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
@@ -6301,7 +6423,7 @@ function openDraftAllPanel(){
 
   // Pre-compute all drafts
   _daState={idx:0, drafts:{}, undoMap:{}, editMode:false};
-  DA_KEYS.forEach(k=>{_daState.drafts[k]=_computeDraft(k)||'';});
+  daKeys().forEach(k=>{_daState.drafts[k]=_computeDraft(k)||'';});
 
   document.getElementById('da-overlay').style.display='block';
   const panel=document.getElementById('da-panel');
@@ -6325,18 +6447,18 @@ function closeDraftAllPanel(){
 
 function _daRender(){
   const {idx,drafts,editMode}=_daState;
-  if(idx>=DA_KEYS.length){_daShowDone();return;}
+  if(idx>=daKeys().length){_daShowDone();return;}
 
-  const key=DA_KEYS[idx];
+  const key=daKeys()[idx];
   const draft=drafts[key]||'';
-  const total=DA_KEYS.length;
+  const total=daKeys().length;
 
   // Progress
   document.getElementById('da-progress-text').textContent=`${idx+1} of ${total}`;
   document.getElementById('da-progress-fill').style.width=`${((idx)/total)*100}%`;
 
   // Label
-  document.getElementById('da-field-label').textContent=DA_LABELS[key];
+  document.getElementById('da-field-label').textContent=daLabel(key);
 
   // Existing content warning
   const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
@@ -6381,7 +6503,7 @@ function _daShowDone(){
 }
 
 function daAccept(){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const draft=_daState.editMode
     ?document.getElementById('da-edit-area').value
     :_daState.drafts[key];
@@ -6391,7 +6513,7 @@ function daAccept(){
   // compute to ''. Without this guard, clicking Accept on such a field
   // silently overwrote — blanked — any content the PM had already typed in.
   if(!draft&&existing){
-    toast(`No auto-draft available for "${DA_LABELS[key]}" — use Skip to keep the existing text, or Edit to write one manually.`,'warn',5000);
+    toast(`No auto-draft available for "${daLabel(key)}" — use Skip to keep the existing text, or Edit to write one manually.`,'warn',5000);
     return;
   }
   if(ta){
@@ -6424,14 +6546,14 @@ function daSkip(){
 function daToggleEdit(){
   _daState.editMode=!_daState.editMode;
   if(_daState.editMode){
-    const key=DA_KEYS[_daState.idx];
+    const key=daKeys()[_daState.idx];
     document.getElementById('da-edit-area').value=_daState.drafts[key];
   }
   _daRender();
 }
 
 function daRegen(){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const fresh=_computeDraft(key);
   if(fresh){
     _daState.drafts[key]=fresh;
@@ -6444,7 +6566,7 @@ function daRegen(){
 }
 
 function daNudge(instruction){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const current=_daState.editMode
     ?document.getElementById('da-edit-area').value
     :_daState.drafts[key];
@@ -6741,12 +6863,13 @@ function parseModDateRange(str){
   if(parts.length<2)return null;
   const parseOne=s=>{
     s=s.trim();
-    // "09 Feb 2026"
-    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+    // "09 Feb 2026" or the 2-digit-year shorthand PMs often type, "09 Feb 26"
+    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2}|\d{4})$/);
     if(m1){
       const mon=MOD_MONTHS[m1[2].toLowerCase()];
       if(mon===undefined)return null;
-      return new Date(+m1[3],mon,+m1[1]);
+      const yr=m1[3].length===2?2000+ +m1[3]:+m1[3];
+      return new Date(yr,mon,+m1[1]);
     }
     // "2026-02-09"
     const m2=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -11880,7 +12003,7 @@ async function _loadProgrammeDataForExport(programme){
     'enrolments',
     `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${programme.id}&order=learner(last_name)`
   );
-  enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status}));
+  enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
   learners=enrolled.map(e=>e.learner).filter(Boolean);
   const[att,ei]=await Promise.all([
     sb('attendance',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${programme.id}`),
@@ -13269,30 +13392,38 @@ function _renderLRC(){
     </tr>`;
   }).join('');
 
-  // ── Legacy: Unit Standards Achieved (Formative/Summative + Logbook + credits) ──
+  // ── Legacy: Formative/Summative/Logbook — tracked once per module, not per
+  // unit standard. The unit standards themselves are listed separately below
+  // as a read-only reference (POE/audit purposes only). ──
   const usUnits=lrcIsLegacy?unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id):[];
-  const usTotalCredits=usUnits.reduce((s,u)=>s+(+u.credits||0),0);
+  const usCreditsByMod={};
+  usUnits.forEach(u=>{const m=u.mod||1;usCreditsByMod[m]=(usCreditsByMod[m]||0)+(+u.credits||0);});
+  const usModNums=Object.keys(usCreditsByMod).map(Number).sort((a,b)=>a-b);
+  const usTotalCredits=usModNums.reduce((s,m)=>s+usCreditsByMod[m],0);
   let usEarned=0;
-  const usRows=usUnits.map(u=>{
-    const ov=narratives._eisa||{};
-    const fv=ov[usFormativeKey(l.id,u.id)]||'';
-    const sv=ov[usSummativeKey(l.id,u.id)]||'';
-    const cr=+u.credits||0;
+  const ovLrc=narratives._eisa||{};
+  const mkLrcB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
+  const usRows=usModNums.map(modNum=>{
+    const fv=legacyFormativeValue(ovLrc,l.id,modNum);
+    const sv=legacySummativeValue(ovLrc,l.id,modNum);
+    const lbv=legacyLogbookValue(ovLrc,l.id,modNum);
+    const cr=usCreditsByMod[modNum];
     const achieved=fv==='C'&&sv==='C';
     if(achieved)usEarned+=cr;
-    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
     return`<tr>
-      <td style="text-align:left;padding-left:12px">${esc(String(u.id))} ${u.title?`<small style="color:var(--muted)">— ${esc(u.title)}</small>`:''}</td>
+      <td style="text-align:left;padding-left:12px">Module ${modNum}</td>
       <td style="text-align:center">${cr}</td>
-      <td style="text-align:center">${mkB(fv)}</td>
-      <td style="text-align:center">${mkB(sv)}</td>
-      <td style="text-align:center">${achieved?'<span class="lrc-badge c">Achieved</span>':'<span class="lrc-badge na">Not Yet</span>'}</td>
+      <td style="text-align:center">${mkLrcB(fv)}</td>
+      <td style="text-align:center">${mkLrcB(sv)}</td>
+      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</td>
+      <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
     </tr>`;
   }).join('');
-  // One logbook mark per module now — build a compact per-module list instead
-  // of a single qualification-wide value (see legacyLogbookValue).
-  const usLogbookMods=[...new Set(usUnits.map(u=>u.mod||1))].sort((a,b)=>a-b);
-  const usLogbookByMod=usLogbookMods.map(modNum=>({mod:modNum,val:legacyLogbookValue(narratives._eisa,l.id,modNum)}));
+  // Read-only reference list of the actual unit standards, grouped by module.
+  const usRefList=usModNums.map(modNum=>{
+    const units=usUnits.filter(u=>(u.mod||1)===modNum);
+    return`<div style="margin-bottom:4px"><strong>Module ${modNum}:</strong> ${units.map(u=>`${esc(String(u.id))} (${esc(String(u.credits||0))}cr)`).join(', ')}</div>`;
+  }).join('');
 
   // ── Comment ──
   const comment=(narratives._comments||{})[l.id]||remoteComments[`${l.id}_${month}`]||'';
@@ -13346,14 +13477,14 @@ function _renderLRC(){
         <div class="lrc-section-title">📊 ${lrcIsLegacy?'Unit Standards Achieved':'Assessment Results (EISA)'}</div>
         ${lrcIsLegacy?`<table class="lrc-eisa-table">
           <thead><tr>
-            <th style="text-align:left">Unit Standard</th><th style="text-align:center">Credits</th>
+            <th style="text-align:left">Module</th><th style="text-align:center">Credits</th>
             <th style="text-align:center">Formative</th><th style="text-align:center">Summative</th>
-            <th style="text-align:center">Status</th>
+            <th style="text-align:center">Logbook</th><th style="text-align:center">Status</th>
           </tr></thead>
-          <tbody>${usRows||`<tr><td colspan="5" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
+          <tbody>${usRows||`<tr><td colspan="6" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
         </table>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:8.5pt;flex-wrap:wrap;gap:8px">
-          <span style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">Logbook: ${usLogbookByMod.map(m=>`<span style="white-space:nowrap">M${m.mod} ${m.val==='C'?'<span class="lrc-badge c">Achieved</span>':m.val==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</span>`).join('')||'<span class="lrc-badge na">—</span>'}</span>
+        <div style="margin-top:8px;font-size:7.5pt;color:var(--muted)">${usRefList}</div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:6px;font-size:8.5pt">
           <strong>Total Credits: ${usEarned} / ${usTotalCredits}</strong>
         </div>`:`<table class="lrc-eisa-table">
           <thead><tr>
@@ -13715,7 +13846,10 @@ function openUsResultsPaste(modNum){
   if(!units.length){toast('No unit standards registered for this module','warn');return;}
   _usPasteModNum=modNum;
   _usPasteUnits=units;
-  const headerCols=['ID Number',...units.flatMap(u=>[`${u.id}-F`,`${u.id}-S`]),'Logbook'];
+  // Formative/Summative/Logbook are tracked once per learner per module now
+  // (not per unit standard) — one column each, regardless of how many unit
+  // standards this module lists.
+  const headerCols=['ID Number','Formative','Summative','Logbook'];
   document.getElementById('us-paste-title').textContent=`📋 Bulk Unit Standards Paste — Module ${modNum}`;
   document.getElementById('us-paste-template').textContent=headerCols.join('\t');
   document.getElementById('us-paste-area').value='';
@@ -13739,7 +13873,7 @@ function _usNormResult(v){
 
 function _usColLabel(c){
   if(c.type==='logbook')return'Logbook';
-  return`${c.usId}-${c.role==='formative'?'F':'S'}`;
+  return c.role==='formative'?'Formative':'Summative';
 }
 
 function parseUsPaste(){
@@ -13756,20 +13890,15 @@ function parseUsPaste(){
   const lines=raw.split('\n').map(l=>l.split('\t').map(c=>c.trim())).filter(r=>r.length>=1&&r.some(c=>c));
   if(!lines.length){commit.disabled=true;return;}
 
-  // Match header columns to unit standards by normalised label (spaces,
-  // dashes and underscores stripped) so "10047-F", "10047 F" and "10047_F"
-  // all resolve the same way regardless of how Excel formatted the paste.
-  const colMap={};
-  _usPasteUnits.forEach(u=>{
-    const idNorm=String(u.id).toUpperCase().replace(/[\s_-]+/g,'');
-    colMap[idNorm+'F']={type:'unit',usId:u.id,role:'formative',credits:+u.credits||0};
-    colMap[idNorm+'S']={type:'unit',usId:u.id,role:'summative',credits:+u.credits||0};
-  });
+  // Formative/Summative/Logbook are tracked once per learner per module —
+  // recognise those three columns by header label regardless of exact
+  // wording ("Formative"/"F", "Summative"/"S", "Logbook"/"LB").
   const header=lines[0];
   const allCols=header.slice(1).map((h,i)=>{
     const norm=(h||'').toUpperCase().replace(/[\s_-]+/g,'');
     if(norm==='LOGBOOK'||norm==='LB')return{col:i+1,type:'logbook',label:h};
-    if(colMap[norm])return{col:i+1,label:h,...colMap[norm]};
+    if(norm==='FORMATIVE'||norm==='F')return{col:i+1,type:'unit',role:'formative',label:h};
+    if(norm==='SUMMATIVE'||norm==='S')return{col:i+1,type:'unit',role:'summative',label:h};
     return{col:i+1,type:null,label:h};
   });
   const validCols=allCols.filter(c=>c.type);
@@ -13878,7 +14007,7 @@ function commitUsPaste(){
     const l=r.learner;
     r.cells.forEach(c=>{
       if(!c.value)return; // blank/unrecognised — leave the existing value alone
-      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?usFormativeKey(l.id,c.usId):usSummativeKey(l.id,c.usId));
+      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?legacyFormativeKey(l.id,modNum):legacySummativeKey(l.id,modNum));
       const prev=narratives._eisa[key]||'';
       if(prev===c.value)return; // no-op, keep the undo stack meaningful
       affected.push({key,prev});
@@ -14411,7 +14540,8 @@ function _updateProgressPanel(){
     const a=attState[l.id]||{};
     return attDates.every(d=>a[d]&&a[d]!=='');
   });
-  items.push({id:'att',label:'Attendance',state:allAttFilled?'done':attFilled?'partial':'',anchor:'att'});
+  const noClassesThisMonth=narratives.no_classes===true||narratives.no_classes==='true';
+  items.push({id:'att',label:'Attendance',state:noClassesThisMonth?'done':(allAttFilled?'done':attFilled?'partial':''),anchor:'att'});
 
   // 2b. Module dates — every module card needs a date range before send,
   // so a report can never go out showing an unfilled "Add dates" card to
@@ -14451,9 +14581,9 @@ function _updateProgressPanel(){
   // Formative/Summative unit-standard tracking, not a QCTO EISA process, so
   // there's nothing meaningful for a PM to write here.
   const legacyForNar=isLegacyProgramme(activeProgramme);
-  const narModNums=displayModuleNums(activeProgramme).filter(n=>n<=4);
+  const narModNums=displayModuleNums(activeProgramme);
   const narKeys=[...narModNums.map(n=>`feedback_m${n}`),'att_summary',...(legacyForNar?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
-  const narLabels={feedback_m1:'Module 1 Narrative',feedback_m2:'Module 2 Narrative',feedback_m3:'Module 3 Narrative',feedback_m4:'Module 4 Narrative',att_summary:'Attendance Summary',eisa_summary:'EISA',time_keeping:'Time Keeping',interaction:'Interaction & Participation',concerns:'Concerns'};
+  const narLabels=Object.fromEntries(narKeys.map(k=>[k,daLabel(k).replace(' — Feedback',' Narrative')]));
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
   items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
@@ -14769,7 +14899,7 @@ async function runMultiProgExport() {
         'enrolments',
         `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`
       );
-      progEnrolments = enrolled.map(e => ({ id: e.id, programme_id: e.programme_id, learner_id: e.learner_id, status: e.status }));
+      progEnrolments = enrolled.map(e => ({ id: e.id, programme_id: e.programme_id, learner_id: e.learner_id, status: e.status, fields: e.fields || {} }));
       progLearners = enrolled.map(e => e.learner).filter(Boolean);
 
       const [att, ei, lc] = await Promise.all([
