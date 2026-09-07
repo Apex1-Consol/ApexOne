@@ -21,7 +21,7 @@ const FIELD_IDS = {
   programmeName: "fc7ada3e-e3e4-483f-b07b-abecaa6a2edd",
   poeStatus: "0727b6fb-564b-403a-a82a-bccb9c02c31b",
   attendancePct: "98e07ffc-1b10-4fe1-91bc-c8cf4ed5926e",
-  overallJudgment: "adff55e9-edb7-437f-a969-3ef71c82bf0c",
+    overallJudgment: "a84ca101-9dc7-446c-9ef1-1590d9070452",
   eisaReadiness: "b22663b2-6936-4112-b62a-1027ae601be3",
   recommendationStatus: "fa0ee5b4-0cb7-4099-ba0a-cbe83ad31202",
   eisaResult: "cc8dcdf1-6c0b-4649-aae6-7cf42667dcd1",
@@ -35,6 +35,11 @@ const FIELD_IDS = {
 };
 
 const DROPDOWN_OPTIONS: Record<string, Record<string, string>> = {
+  [FIELD_IDS.overallJudgment]: {
+    "Satisfactory": "cb73ded9-d8ce-4f9a-bbfa-6edcd358cdc9",
+    "Partially Satisfactory": "2ca6c2c1-adbb-47e3-b771-726ebb36a1be",
+    "Unsatisfactory": "529c0128-3544-4124-9cfb-4567bc345a6f",
+  },
   [FIELD_IDS.mouStatus]: {
     "Draft": "6f477281-5ffe-47ad-810d-603e297db0d5",
     "Signed": "2aaf5e04-d196-4e07-aa39-89b3285c3c2f",
