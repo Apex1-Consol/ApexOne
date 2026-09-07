@@ -7098,6 +7098,7 @@ function syncResult(sel){
   updateRowStatus(sel);
   syncEisaToSupabase(sel);
   autoSave();
+  updateProgressPanel();
 }
 function syncSurveyComment(ta){
   const key=ta.dataset.surveyComment;
@@ -7125,6 +7126,7 @@ function syncExamPct(inp){
   if(!narratives._eisa)narratives._eisa={};
   narratives._eisa[inp.dataset.eisa]=inp.value;
   autoSave();
+  updateProgressPanel();
 }
 
 // ── Module date validation helpers ──
@@ -15009,6 +15011,33 @@ function _updateProgressPanel(){
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
   items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
+
+  // 9. Exam % — whenever an Exam V1/V2 result is set to an actual code (C /
+  // NYC / NS / RW, i.e. not blank and not N/A), the matching % score field is
+  // now mandatory before a report can be sent for review, printed, or
+  // downloaded (see _checklistBlocksFinalize). Legacy (SETA unit-standard)
+  // programmes have no Exam V1/V2 concept at all, so this item is skipped
+  // for them entirely — same gate as eisa_summary above.
+  if(!legacyForNar){
+    let examTotal=0,examDone=0;
+    pLearners.forEach(l=>{
+      narModNums.forEach(modNum=>{
+        const res=(eisaState[l.id]||{})[modNum]||{};
+        const ek=`${l.id}_m${modNum}`;
+        const ov=(k,fallback)=>{const saved=(narratives._eisa||{})[`${ek}_${k}`];return saved!==undefined?saved:(fallback||'');};
+        ['examv1','examv2'].forEach(field=>{
+          const v=ov(field,res[field]);
+          if(v&&v!=='N/A'){
+            examTotal++;
+            const p=ov(field+'_pct',res[field+'_pct']);
+            if(p&&String(p).trim().length>0)examDone++;
+          }
+        });
+      });
+    });
+    const examState=examTotal===0?'done':examDone===examTotal?'done':examDone>0?'partial':'';
+    items.push({id:'exampct',label:examTotal>0?`Exam % (${examDone}/${examTotal})`:'Exam %',state:examState,anchor:null});
+  }
 
   // Discoverability nudge for "Draft from data" / "Draft all": badge the
   // toolbar button with how many narrative fields are still empty, and put a
