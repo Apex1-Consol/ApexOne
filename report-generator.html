@@ -497,6 +497,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .badge-nyc{background:var(--warn-bg);color:var(--warn);border:1px solid #FAC775}
 .badge-na{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
 .badge-pending{background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE}
+.badge-terminated{background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5;margin-left:6px}
 
 /* ATTENDANCE PILLS */
 .att-p{display:inline-block;width:28px;text-align:center;background:var(--success-bg);color:var(--success);border:1px solid #9FE1CB;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
@@ -3947,6 +3948,17 @@ function getLearnerTerminatedModule(learnerId){
   const m=e&&e.fields&&e.fields.terminated_module;
   return m?+m:null;
 }
+// Small "Terminated" tag for the assessment-results tables (QCTO and Legacy
+// alike) — shown next to a learner's name on the module they left in, so a
+// PM sees termination in context without it living inside the C/NYC/NS/RW
+// result dropdowns themselves. See buildLearnerStatusBlock for the control
+// that actually sets this.
+function terminatedTag(learnerId,modNum){
+  if(!isLearnerTerminated(learnerId))return'';
+  const m=getLearnerTerminatedModule(learnerId);
+  if(m&&m!==modNum)return'';
+  return'<span class="badge badge-terminated">Terminated</span>';
+}
 async function setLearnerTermination(learnerId,terminated,moduleNum){
   const e=_findEnrolment(learnerId);
   if(!e)return;
@@ -5689,7 +5701,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
     const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
     const resultVals={km,pm,wm};
     const colCells=cols.map(c=>`<td>${mkResult(c.key,resultVals[c.key])}</td>`).join('');
-    return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${colCells}<td>${mkExam('examv1','examv1_pct',res.examv1,res.examv1_pct)}</td><td>${mkExam('examv2','examv2_pct',res.examv2,res.examv2_pct)}</td><td style="text-align:center">${overall}</td></tr>`;
+    return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}${terminatedTag(l.id,modNum)}</td>${colCells}<td>${mkExam('examv1','examv1_pct',res.examv1,res.examv1_pct)}</td><td>${mkExam('examv2','examv2_pct',res.examv2,res.examv2_pct)}</td><td style="text-align:center">${overall}</td></tr>`;
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
@@ -5791,7 +5803,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
         const anyProgress=earned>0||lbVal==='C'||anyAssessed;
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
-        return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
+        return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}${terminatedTag(l.id,modNum)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
       const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
         <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
