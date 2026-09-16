@@ -7,6 +7,7 @@
   <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
 :root{
   --bg-primary:#0C2F52;--bg-secondary:#0A2440;--bg-card:#123458;--bg-card-hover:#1A4570;
@@ -38,6 +39,9 @@ input,select,textarea{font-family:inherit;}
 .field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px;}
 .field input{width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;}
 #login-error{color:var(--accent-rose);font-size:12px;min-height:16px;margin-bottom:8px;}
+.recovery-panel{display:none;}
+.recovery-panel.visible{display:block;}
+.login-link,.recovery-back{border:0;background:none;color:var(--accent-cyan);padding:0;font-size:11px;cursor:pointer;}
 
 /* ---- shell ---- */
 #app{display:none;grid-template-columns:250px 1fr;min-height:100vh;}
@@ -145,9 +149,18 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <div class="login-brand"><div class="login-brand-icon">A</div><div class="login-brand-name">APEX ONE</div></div>
     <div class="login-sub">FAM Registry — standalone build. Sign in with your ApexOne account.</div>
     <div id="login-error"></div>
+    <div id="turnstile-widget" style="margin:12px 0;min-height:65px;"></div>
     <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="login-password" type="password" autocomplete="current-password"></div>
-    <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="handleLogin()">Sign in</button>
+    <div class="field login-password-field"><label>Password</label><input id="login-password" type="password" autocomplete="current-password"></div>
+    <button class="btn btn-gold login-submit-button" style="width:100%;justify-content:center;" onclick="handleLogin()">Sign in</button>
+    <div class="login-help" style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--text-muted);"><span>Need access?</span><button type="button" class="login-link" onclick="startRecovery()">Forgot password</button></div>
+    <div id="recovery-panel" class="recovery-panel">
+      <div class="field" style="margin-top:22px"><label>Reset code</label><input id="recovery-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code"></div>
+      <div class="field"><label>New password</label><input id="recovery-password" type="password" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm new password</label><input id="recovery-password-confirm" type="password" autocomplete="new-password"></div>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="completeRecovery()">Set new password</button>
+      <button type="button" class="recovery-back" onclick="location.reload()">← Back to sign in</button>
+    </div>
   </div>
 </div>
 
@@ -169,7 +182,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <div class="top-bar">
       <div>
         <div class="page-title">Facilitators, Assessors &amp; Moderators</div>
-        <div class="page-subtitle">Registry &middot; scope, documents and SLA tracked per person, per SETA</div>
+        <div class="page-subtitle">Registry &middot; scope and documents tracked per person, per SETA</div>
       </div>
       <div style="display:flex;gap:10px;">
         <button class="btn btn-secondary btn-sm" onclick="loadAll()">&#8635; Refresh</button>
@@ -186,7 +199,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
         <div class="content-container" style="margin-bottom:0;">
           <div class="container-header">
             <h2>Practitioner registry</h2>
-            <span style="font-size:11px;color:var(--text-muted);">Scope, documents and SLA live in the profile panel &rarr;</span>
+            <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
           </div>
           <div class="tabs" id="reg-tabs"></div>
           <div class="filter-row">
@@ -239,15 +252,18 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <h3>Add SETA registration</h3>
     <div class="modal-error" id="rg-error"></div>
     <input type="hidden" id="rg-assessor-id">
-    <div class="field"><label>SETA name *</label><input id="rg-seta" placeholder="e.g. BANKSETA"></div>
-    <div class="field"><label>Role *</label>
-      <select id="rg-role"><option>Assessor</option><option>Moderator</option><option>Facilitator</option></select>
+    <div class="field"><label>Role(s) *</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:2px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-primary);text-transform:none;letter-spacing:0;font-weight:400;"><input type="checkbox" value="Facilitator" class="rg-role-cb" style="width:auto;"> Facilitator</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-primary);text-transform:none;letter-spacing:0;font-weight:400;"><input type="checkbox" value="Assessor" class="rg-role-cb" style="width:auto;"> Assessor</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-primary);text-transform:none;letter-spacing:0;font-weight:400;"><input type="checkbox" value="Moderator" class="rg-role-cb" style="width:auto;"> Moderator</label>
+      </div>
     </div>
-    <div class="field"><label>Registration number</label><input id="rg-regnum"></div>
-    <div class="field"><label>Expiry date</label><input id="rg-expiry" type="date"></div>
-    <div class="field"><label>Training provider(s)</label><input id="rg-providers"></div>
+    <div class="field"><label>Status *</label>
+      <select id="rg-status"><option>Active</option><option>Inactive</option></select>
+    </div>
     <div class="field"><label>Scope &mdash; qualifications covered</label>
-      <select id="rg-scope" multiple size="4"></select>
+      <select id="rg-scope" multiple size="8"></select>
       <div style="font-size:10.5px;color:var(--text-muted);margin-top:4px;">Cmd/Ctrl-click to select more than one. New qualifications can be added from the Programmes tab in ApexOne.</div>
     </div>
     <div class="modal-actions">
@@ -263,33 +279,17 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <h3>Add / update document</h3>
     <div class="modal-error" id="dc-error"></div>
     <input type="hidden" id="dc-assessor-id">
-    <div class="field"><label>Document type *</label><input id="dc-type" placeholder="e.g. CV, ID document, SLA agreement, Code of conduct"></div>
-    <div class="field"><label>Status *</label>
-      <select id="dc-status"><option>Missing</option><option>Current</option><option>Verified</option><option>Signed</option><option>Expired</option></select>
+    <div class="field"><label>Document type *</label>
+      <select id="dc-type"><option>CV</option><option>Highest Qualification</option><option>SLA</option><option>ID</option><option>QUAL</option><option>AFFIDAVIT</option></select>
     </div>
-    <div class="field"><label>Date</label><input id="dc-date" type="date"></div>
+    <div class="field"><label>Status *</label>
+      <select id="dc-status"><option>Missing</option><option>Current</option></select>
+    </div>
+    <div class="field"><label>Date loaded</label><input id="dc-date" type="date"></div>
+    <div class="field"><label>Upload file</label><input id="dc-file" type="file"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-document')">Cancel</button>
       <button class="btn btn-gold btn-sm" onclick="saveDocument()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Contract modal -->
-<div class="modal-overlay" id="modal-contract">
-  <div class="modal">
-    <h3>Contract / SLA status</h3>
-    <div class="modal-error" id="ct-error"></div>
-    <input type="hidden" id="ct-assessor-id">
-    <div class="field"><label>SLA status *</label>
-      <select id="ct-status"><option>Not signed</option><option>Signed</option><option>Expired</option></select>
-    </div>
-    <div class="field"><label>Signed date</label><input id="ct-date" type="date"></div>
-    <div class="field"><label>Provider name(s)</label><input id="ct-providers"></div>
-    <div class="field"><label>Notes</label><textarea id="ct-notes" rows="3"></textarea></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-contract')">Cancel</button>
-      <button class="btn btn-gold btn-sm" onclick="saveContract()">Save</button>
     </div>
   </div>
 </div>
@@ -305,7 +305,6 @@ let state = {
   assessors: [],       // practitioner rows
   registrations: [],   // fam_seta_registrations, each with .scope[] (qualification rows) attached
   documents: [],
-  contracts: [],
   qualifications: [],
   selectedAssessorId: null,
   activeTab: 'all',
@@ -319,13 +318,17 @@ async function handleLogin(){
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (typeof turnstileToken !== 'undefined' && !turnstileToken) { errEl.textContent = 'Please complete the security check first.'; return; }
+  const loginOpts = (typeof turnstileToken !== 'undefined' && turnstileToken) ? { captchaToken: turnstileToken } : {};
+  const { error } = await sb.auth.signInWithPassword({ email, password, options: loginOpts });
+  if (typeof window.turnstile !== 'undefined' && typeof turnstileWidgetId !== 'undefined' && turnstileWidgetId !== null) { window.turnstile.reset(turnstileWidgetId); }
+  if (typeof turnstileToken !== 'undefined') turnstileToken = '';
   if (error) { errEl.textContent = error.message; return; }
   await boot();
 }
 async function handleLogout(){ await sb.auth.signOut(); location.reload(); }
 
-let bootInProgress = false;
+let bootInProgress=false; let turnstileToken=''; let turnstileWidgetId=null; const TURNSTILE_SITE_KEY='0x4AAAAAAE4gMGMxYC7Zn1qJ'; function renderTurnstile(){if(!window.turnstile||turnstileWidgetId!==null)return;turnstileWidgetId=window.turnstile.render('#turnstile-widget',{sitekey:TURNSTILE_SITE_KEY,theme:'dark',callback:t=>turnstileToken=t,'expired-callback':()=>turnstileToken='','error-callback':()=>turnstileToken=''});} const turnstileRetry=setInterval(()=>{renderTurnstile();if(turnstileWidgetId!==null)clearInterval(turnstileRetry);},250);
 
   async function boot(){
       if (bootInProgress) return;
@@ -368,24 +371,22 @@ async function api(path, opts = {}){
 // ---------- data load ----------
 async function loadAll(){
   try {
-    const [assessors, regs, scope, docs, contracts, quals] = await Promise.all([
+    const [assessors, regs, scope, docs, quals] = await Promise.all([
       api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
       api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
       api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
       api('fam_documents?select=*'),
-      api('fam_contracts?select=*'),
-      api('qualifications?select=id,name,qualification_code&order=name.asc'),
+      api('qualifications?select=id,name,qualification_code,seta&order=name.asc'),
     ]);
     state.assessors = assessors || [];
     state.documents = docs || [];
-    state.contracts = contracts || [];
     state.qualifications = quals || [];
     const scopeByReg = {};
     (scope||[]).forEach(s => { (scopeByReg[s.registration_id] ||= []).push(s); });
     state.registrations = (regs||[]).map(r => ({ ...r, scope: scopeByReg[r.id] || [] }));
 
     const sel = document.getElementById('rg-scope');
-    sel.innerHTML = state.qualifications.map(q => `<option value="${q.id}">${escapeHtml(q.name)}</option>`).join('');
+    sel.innerHTML = state.qualifications.map(q => `<option value="${q.id}">${q.seta && q.seta!=='N/A' ? '['+escapeHtml(q.seta)+'] ' : ''}${escapeHtml(q.name)}</option>`).join('');
 
     renderStats();
     renderTabs();
@@ -404,19 +405,25 @@ function regStatus(r){
   return new Date(r.registration_expiry_date) < new Date() ? 'expired' : 'active';
 }
 function regsFor(assessorId){ return state.registrations.filter(r => String(r.assessor_id) === String(assessorId)); }
+function regIsActive(r){ return (r.status || 'Active') === 'Active'; }
 function overallStatus(assessorId){
   const regs = regsFor(assessorId);
   if (!regs.length) return 'unknown';
-  const statuses = new Set(regs.map(regStatus));
-  if (statuses.size === 1) return [...statuses][0];
-  return 'mixed';
+  return regs.some(regIsActive) ? 'active' : 'inactive';
 }
-function rolesFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.role))]; }
-function setasFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.seta_name))]; }
+function rolesFor(assessorId){
+  const set = new Set();
+  regsFor(assessorId).forEach(r => {
+    const roles = (r.roles && r.roles.length) ? r.roles : (r.role ? [r.role] : []);
+    roles.forEach(x => set.add(x));
+  });
+  return [...set];
+}
+function setasFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.seta_name).filter(s => s && s !== 'N/A'))]; }
 function daysUntil(d){ return Math.ceil((new Date(d) - new Date()) / 86400000); }
 
 function statusPillHtml(status){
-  const map = { active:['status-active','Active'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
+  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
   const [cls,label] = map[status] || map.unknown;
   return `<span class="status-dot ${cls}">${label}</span>`;
 }
@@ -488,7 +495,7 @@ function renderTable(){
       <td><a onclick="event.stopPropagation();renderDetail(${a.id})">&rarr;</a></td>
     </tr>`;
   }).join('');
-  document.getElementById('registry-footer').textContent = `${rows.length} practitioner${rows.length===1?'':'s'} shown · scope, documents and SLA in profile`;
+  document.getElementById('registry-footer').textContent = `${rows.length} practitioner${rows.length===1?'':'s'} shown · scope and documents in profile`;
 }
 
 // ---------- render: renewal queue ----------
@@ -528,27 +535,18 @@ function renderDetail(assessorId){
     <div class="reg-group">
       <div class="reg-group-head"><span>${escapeHtml(seta)}</span><span style="color:var(--text-muted);font-weight:400;">${list.length} reg${list.length===1?'':'s'}</span></div>
       ${list.map(r => {
-        const status = regStatus(r);
-        const pct = status === 'expired' ? 100 : (r.registration_expiry_date ? Math.max(8, 100 - Math.min(100, daysUntil(r.registration_expiry_date)/730*100)) : 30);
+        const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
         return `<div class="reg-card">
-          <div class="reg-card-top"><span><strong>${escapeHtml(r.role)}</strong> &middot; ${escapeHtml(r.registration_number||'no reg number')}</span>${statusPillHtml(status)}</div>
-          <div style="font-size:11px;color:var(--text-muted);">${r.registration_expiry_date ? 'Expiry '+r.registration_expiry_date : 'No expiry captured'}</div>
-          <div class="progress"><div class="progress-fill" style="width:${pct}%;background:${status==='expired'?'#A63A3A':'#3B6D11'};"></div></div>
+          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regIsActive(r) ? 'active' : 'inactive')}</div>
           <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
-          ${r.training_providers ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px;">Training provider(s): ${escapeHtml(r.training_providers)}</div>` : ''}
         </div>`;
       }).join('')}
     </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
 
   const docs = state.documents.filter(d => d.assessor_id === assessorId);
   const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => `
-      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div></div>`).join('')}</div>`
+      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>${d.file_url?`<div style="margin-top:4px;"><button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button></div>`:''}</div>`).join('')}</div>`
     : `<div class="empty-note">No documents captured yet.</div>`;
-
-  const contract = state.contracts.find(c => c.assessor_id === assessorId);
-  const contractHtml = contract
-    ? `<div class="contract-banner ${contract.sla_status==='Signed'?'contract-signed':'contract-unsigned'}">${escapeHtml(contract.sla_status)}${contract.signed_date?' · '+contract.signed_date:''}</div>`
-    : `<div class="empty-note">No contract on file.</div>`;
 
   const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
   panel.innerHTML = `
@@ -583,13 +581,6 @@ function renderDetail(assessorId){
         </div>
         <div style="margin-top:8px;">${docsHtml}</div>
       </div>
-      <div>
-        <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Contract</span>
-          <button class="small-link" onclick="openContract(${assessorId})">Edit</button>
-        </div>
-        <div style="margin-top:8px;">${contractHtml}</div>
-      </div>
     </div>`;
 }
 
@@ -623,29 +614,28 @@ async function savePractitioner(){
 
 function openAddRegistration(assessorId){
   document.getElementById('rg-assessor-id').value = assessorId;
-  document.getElementById('rg-seta').value = '';
-  document.getElementById('rg-regnum').value = '';
-  document.getElementById('rg-expiry').value = '';
-  document.getElementById('rg-providers').value = '';
+  document.querySelectorAll('.rg-role-cb').forEach(cb => cb.checked = false);
+  document.getElementById('rg-status').value = 'Active';
+  document.getElementById('rg-scope').selectedIndex = -1;
   document.getElementById('rg-error').textContent = '';
   openModal('modal-registration');
 }
 async function saveRegistration(){
   const assessorId = document.getElementById('rg-assessor-id').value;
-  const seta = document.getElementById('rg-seta').value.trim();
-  const role = document.getElementById('rg-role').value;
-  if (!seta) { document.getElementById('rg-error').textContent = 'SETA name is required.'; return; }
+  const roles = [...document.querySelectorAll('.rg-role-cb:checked')].map(cb => cb.value);
+  const status = document.getElementById('rg-status').value;
+  if (!roles.length) { document.getElementById('rg-error').textContent = 'Select at least one role.'; return; }
   if (!state.tenantId) { document.getElementById('rg-error').textContent = 'No tenant on your account.'; return; }
   const scopeIds = [...document.getElementById('rg-scope').selectedOptions].map(o => o.value);
+  const setaNames = [...new Set(scopeIds.map(id => (state.qualifications.find(q=>q.id===id)||{}).seta).filter(s => s && s !== 'N/A'))];
   try {
     const [created] = await api('fam_seta_registrations', { method:'POST', body: JSON.stringify({
       tenant_id: state.tenantId,
       assessor_id: Number(assessorId),
-      seta_name: seta,
-      role,
-      registration_number: document.getElementById('rg-regnum').value || null,
-      registration_expiry_date: document.getElementById('rg-expiry').value || null,
-      training_providers: document.getElementById('rg-providers').value || null,
+      seta_name: setaNames.length ? setaNames.join(', ') : 'N/A',
+      role: roles[0],
+      roles,
+      status,
     })});
     if (scopeIds.length) {
       await api('fam_registration_scope', { method:'POST', body: JSON.stringify(
@@ -661,62 +651,62 @@ async function saveRegistration(){
 
 function openAddDocument(assessorId){
   document.getElementById('dc-assessor-id').value = assessorId;
-  document.getElementById('dc-type').value = '';
+  document.getElementById('dc-type').value = 'CV';
   document.getElementById('dc-status').value = 'Missing';
   document.getElementById('dc-date').value = '';
+  document.getElementById('dc-file').value = '';
   document.getElementById('dc-error').textContent = '';
   openModal('modal-document');
 }
+async function uploadDocumentFile(file, tenantId, assessorId){
+  const path = `${tenantId}/${assessorId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPA_URL}/storage/v1/object/fam-documents/${path}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + (session ? session.access_token : SUPA_ANON),
+      'apikey': SUPA_ANON,
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  });
+  if (!res.ok) throw new Error('File upload failed: ' + (await res.text()));
+  return path; // fam_documents.file_url now stores the storage object path, not a public URL —
+               // the bucket is private, so viewing goes through viewDocument()'s signed URL below.
+}
+async function viewDocument(path){
+  try {
+    const { data, error } = await sb.storage.from('fam-documents').createSignedUrl(path, 60);
+    if (error) throw error;
+    window.open(data.signedUrl, '_blank', 'noopener');
+  } catch(e) { toast('error', 'Could not open file: ' + e.message); }
+}
 async function saveDocument(){
   const assessorId = document.getElementById('dc-assessor-id').value;
-  const docType = document.getElementById('dc-type').value.trim();
-  if (!docType) { document.getElementById('dc-error').textContent = 'Document type is required.'; return; }
+  const docType = document.getElementById('dc-type').value;
   if (!state.tenantId) { document.getElementById('dc-error').textContent = 'No tenant on your account.'; return; }
+  const saveBtn = document.querySelector('#modal-document .btn-gold');
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
+    const fileInput = document.getElementById('dc-file');
+    let fileUrl = null;
+    if (fileInput.files && fileInput.files[0]) {
+      fileUrl = await uploadDocumentFile(fileInput.files[0], state.tenantId, assessorId);
+    }
     await api('fam_documents', { method:'POST', body: JSON.stringify({
       tenant_id: state.tenantId,
       assessor_id: Number(assessorId),
       doc_type: docType,
       status: document.getElementById('dc-status').value,
       doc_date: document.getElementById('dc-date').value || null,
+      ...(fileUrl ? { file_url: fileUrl } : {}),
     })});
     closeModal('modal-document');
     toast('success','Document saved.');
     await loadAll();
     renderDetail(Number(assessorId));
   } catch(e){ document.getElementById('dc-error').textContent = 'Failed to save: ' + e.message; }
-}
-
-function openContract(assessorId){
-  const existing = state.contracts.find(c => c.assessor_id === assessorId);
-  document.getElementById('ct-assessor-id').value = assessorId;
-  document.getElementById('ct-status').value = existing ? existing.sla_status : 'Not signed';
-  document.getElementById('ct-date').value = existing ? (existing.signed_date||'') : '';
-  document.getElementById('ct-providers').value = existing ? (existing.provider_names||'') : '';
-  document.getElementById('ct-notes').value = existing ? (existing.notes||'') : '';
-  document.getElementById('ct-error').textContent = '';
-  openModal('modal-contract');
-}
-async function saveContract(){
-  const assessorId = Number(document.getElementById('ct-assessor-id').value);
-  if (!state.tenantId) { document.getElementById('ct-error').textContent = 'No tenant on your account.'; return; }
-  const existing = state.contracts.find(c => c.assessor_id === assessorId);
-  const body = {
-    tenant_id: state.tenantId,
-    assessor_id: assessorId,
-    sla_status: document.getElementById('ct-status').value,
-    signed_date: document.getElementById('ct-date').value || null,
-    provider_names: document.getElementById('ct-providers').value || null,
-    notes: document.getElementById('ct-notes').value || null,
-  };
-  try {
-    if (existing) await api(`fam_contracts?id=eq.${existing.id}`, { method:'PATCH', body: JSON.stringify(body) });
-    else await api('fam_contracts', { method:'POST', body: JSON.stringify(body) });
-    closeModal('modal-contract');
-    toast('success','Contract updated.');
-    await loadAll();
-    renderDetail(assessorId);
-  } catch(e){ document.getElementById('ct-error').textContent = 'Failed to save: ' + e.message; }
+  finally { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
 }
 
 // ---------- toast ----------
@@ -728,6 +718,35 @@ function toast(type, msg){
   setTimeout(() => el.remove(), 4000);
 }
 
+let recoveryInFlight = false;
+async function startRecovery(){
+  if (recoveryInFlight) return;
+  const email=document.getElementById('login-email').value.trim(), err=document.getElementById('login-error');
+  if(!email){err.textContent='Enter your email first, then choose Forgot password.';return;}
+  if(typeof turnstileToken!=='undefined' && !turnstileToken){err.textContent='Please complete the security check first.';return;}
+  recoveryInFlight = true;
+  const opts=typeof turnstileToken!=='undefined' && turnstileToken ? {captchaToken:turnstileToken} : {};
+  const {error}=await sb.auth.resetPasswordForEmail(email,{...opts,redirectTo:window.location.origin+window.location.pathname});
+  if (typeof window.turnstile !== 'undefined' && typeof turnstileWidgetId !== 'undefined' && turnstileWidgetId !== null) { window.turnstile.reset(turnstileWidgetId); }
+  if (typeof turnstileToken !== 'undefined') turnstileToken = '';
+  recoveryInFlight = false;
+  if(error){err.textContent='Password reset failed: '+error.message;return;}
+  document.querySelector('.login-password-field').style.display='none';
+  document.querySelector('.login-submit-button').style.display='none';
+  document.querySelector('.login-help').style.display='none';
+  document.getElementById('recovery-panel').classList.add('visible');
+  err.style.color='#8FC463'; err.textContent='Reset code sent. Enter it below.';
+}
+async function completeRecovery(){
+  const email=document.getElementById('login-email').value.trim(), code=document.getElementById('recovery-code').value.trim(), password=document.getElementById('recovery-password').value, confirm=document.getElementById('recovery-password-confirm').value, err=document.getElementById('login-error');
+  err.style.color=''; err.textContent='';
+  if(!/^\d{6}$/.test(code)){err.textContent='Enter the 6-digit code from your email.';return;}
+  if(password.length<6){err.textContent='New password must be at least 6 characters.';return;}
+  if(password!==confirm){err.textContent='Passwords do not match.';return;}
+  const {error:ve}=await sb.auth.verifyOtp({email,token:code,type:'recovery'}); if(ve){err.textContent='Code verification failed: '+ve.message;return;}
+  const {error:ue}=await sb.auth.updateUser({password}); if(ue){err.textContent='Password update failed: '+ue.message;return;}
+  err.style.color='#8FC463'; err.textContent='Password updated. You can now sign in.';
+}
 // ---------- init ----------
 sb.auth.onAuthStateChange((_event, session) => { if (session && _event !== 'INITIAL_SESSION') boot(); });
 boot();
