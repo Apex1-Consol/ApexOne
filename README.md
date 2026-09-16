@@ -12,7 +12,7 @@ Two Postgres views back reconciled KPI tiles instead of every page re-deriving i
 
 ## Deployment
 
-This repo (Apex1-Consol/ApexOne) is the canonical source. A GitHub Actions workflow (.github/workflows/deploy.yml) auto-syncs index.html, programme-initiation.html, report-generator.html and qcto-seta-links.html to Apex1-Consol/apex1-consol.github.io on every push to main, so the live site at https://apex1-consol.github.io/ tracks this repo automatically - no manual deploy step needed.
+This repo (Apex1-Consol/ApexOne) is the canonical source. A GitHub Actions workflow (.github/workflows/deploy.yml) auto-syncs index.html, programme-initiation.html, report-generator.html, qcto-seta-links.html and fam-registry.html to Apex1-Consol/apex1-consol.github.io on every push to main, so the live site at https://apex1-consol.github.io/ tracks this repo automatically - no manual deploy step needed.
 
 ## Backend
 
@@ -29,3 +29,12 @@ The Learners Registry has a large amount of duplicate seed data (a small number 
 ## Related repos
 
 apexu-qcto-sync (private - data snapshot store), Apex1-Consol-apexu-reports (client report generator), apex1-consol.github.io (live deployment target - auto-synced from this repo, see Deployment above). project_initiator (PI intake tool, separate Supabase project pi-specialist / srbytujnohsgaegzecbe) IS bridged into this project's data: public.pi_bridge_synced maps its locally-created programmes to apexu_client_id / apexu_programme_id here (2 programmes synced as of 2026-08-29), with failures logged to public.pi_bridge_failures.
+
+## FAM Registry (facilitators, assessors & moderators)
+
+fam-registry.html is a standalone page in this same repo, auto-deployed to apex1-consol.github.io/fam-registry.html alongside the other standalone pages (same deploy step as programme-initiation.html / report-generator.html). It uses the same ApexOne Supabase project and the same sign-in - no separate account or database. Unlike the other standalone pages it isn't bridged data from elsewhere: it reads/writes public.assessors directly, the same table the existing "Assessors & Moderators" tab in index.html uses, so both stay in sync with no sync job needed.
+
+The schema is additive, not a replacement: public.assessors keeps its existing columns (seta_registration_number, accreditation_body, registration_expiry_date) untouched for backward compatibility, plus five new nullable columns (id_number, physical_address, gender, population_group, disability_status). Multi-SETA / multi-role registrations, scope of registration, supporting documents and contract/SLA status live in four new tables: public.fam_seta_registrations (one row per person x SETA x role), public.fam_registration_scope (which public.qualifications a registration covers - reuses the same qualifications table Programmes/EISA use), public.fam_documents, and public.fam_contracts. All four have RLS matching the existing owner_all pattern and are NOT wired into the ClickUp sync outbox yet (deliberately - that would need its own ClickUp list mapping, out of scope for the first cut).
+
+Why standalone first: this mirrors the project_initiator precedent above - build and use it independently while ApexOne's own tab structure catches up, then fold it in without a data migration since it's already reading the same tenant-scoped tables. Folding in later means: replacing the current Assessors & Moderators nav item (data-view="assessors") in index.html with the FAM Registry UI (or embedding it), reusing the same fetchRecords-style calls against fam_seta_registrations / fam_registration_scope / fam_documents / fam_contracts, and retiring fam-registry.html as a separate page once that's live. No bridge table is needed the way pi_bridge_synced is for project_initiator, because FAM Registry was never on a separate database to begin with.
+
