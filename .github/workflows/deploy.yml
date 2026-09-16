@@ -34,7 +34,7 @@ jobs:
           cp fam-registry.html live-site/fam-registry.html
           cp sw.js live-site/sw.js
           cd live-site
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No changes to deploy."
             exit 0
           fi
