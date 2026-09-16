@@ -16,7 +16,7 @@ This repo (Apex1-Consol/ApexOne) is the canonical source. A GitHub Actions workf
 
 ## Backend
 
-Supabase project: apexu-qcto (ref nducwhlmudksgxggjrbo), org ApexOne. The anon key embedded in the HTML is the public one - safe client-side; all real access control is enforced by RLS policies plus the signed-in user's JWT, not by keeping that key secret.
+Supabase project: apex-one (ref nducwhlmudksgxggjrbo), org ApexOne. The anon key embedded in the HTML is the public one - safe client-side; all real access control is enforced by RLS policies plus the signed-in user's JWT, not by keeping that key secret.
 
 ## Accounts
 
