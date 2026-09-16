@@ -215,8 +215,8 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
           <div style="padding:10px 18px;font-size:11px;color:var(--text-muted);" id="registry-footer"></div>
 
           <div class="container-header" style="margin-top:4px;">
-            <h2>Renewal action queue</h2>
-            <span style="font-size:11px;color:var(--text-muted);">Sorted by most overdue first</span>
+            <h2>Needs attention</h2>
+            <span style="font-size:11px;color:var(--text-muted);">Registrations marked Inactive</span>
           </div>
           <div id="renewal-queue"></div>
         </div>
@@ -400,10 +400,6 @@ async function loadAll(){
 }
 
 // ---------- derived helpers ----------
-function regStatus(r){
-  if (!r.registration_expiry_date) return 'unknown';
-  return new Date(r.registration_expiry_date) < new Date() ? 'expired' : 'active';
-}
 function regsFor(assessorId){ return state.registrations.filter(r => String(r.assessor_id) === String(assessorId)); }
 function regIsActive(r){ return (r.status || 'Active') === 'Active'; }
 function overallStatus(assessorId){
@@ -420,7 +416,6 @@ function rolesFor(assessorId){
   return [...set];
 }
 function setasFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.seta_name).filter(s => s && s !== 'N/A'))]; }
-function daysUntil(d){ return Math.ceil((new Date(d) - new Date()) / 86400000); }
 
 function statusPillHtml(status){
   const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
@@ -437,19 +432,19 @@ function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&
 function renderStats(){
   const total = state.assessors.length;
   const totalRegs = state.registrations.length;
-  const active = state.registrations.filter(r => regStatus(r) === 'active').length;
-  const expired = state.registrations.filter(r => regStatus(r) === 'expired').length;
+  const active = state.registrations.filter(r => regIsActive(r)).length;
+  const inactive = totalRegs - active;
   const setas = new Set(state.registrations.map(r => r.seta_name)).size;
   document.getElementById('stat-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Practitioners</div><div class="stat-value">${total}</div></div>
     <div class="stat-card"><div class="stat-label">Total registrations</div><div class="stat-value">${totalRegs}</div></div>
     <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:#8FC463;">${active}</div></div>
-    <div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value" style="color:#E08585;">${expired}</div></div>
+    <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:#E08585;">${inactive}</div></div>
     <div class="stat-card"><div class="stat-label">SETA coverage</div><div class="stat-value">${setas}</div></div>`;
   const banner = document.getElementById('renewal-banner');
-  if (expired > 0) {
+  if (inactive > 0) {
     banner.style.display = 'flex';
-    banner.innerHTML = `<span><strong>${expired}</strong> registration${expired===1?'':'s'} need${expired===1?'s':''} renewal</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
+    banner.innerHTML = `<span><strong>${inactive}</strong> registration${inactive===1?'':'s'} marked Inactive</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
   } else banner.style.display = 'none';
 }
 
@@ -498,22 +493,27 @@ function renderTable(){
   document.getElementById('registry-footer').textContent = `${rows.length} practitioner${rows.length===1?'':'s'} shown · scope and documents in profile`;
 }
 
-// ---------- render: renewal queue ----------
+// ---------- render: needs-attention queue ----------
 function renderRenewalQueue(){
   const overdue = state.registrations
-    .filter(r => regStatus(r) === 'expired')
-    .sort((a,b) => new Date(a.registration_expiry_date) - new Date(b.registration_expiry_date))
+    .filter(r => !regIsActive(r))
+    .sort((a,b) => {
+      const an = (state.assessors.find(x=>x.id===a.assessor_id)||{}).full_name || '';
+      const bn = (state.assessors.find(x=>x.id===b.assessor_id)||{}).full_name || '';
+      return an.localeCompare(bn);
+    })
     .slice(0, 8);
   const el = document.getElementById('renewal-queue');
-  if (!overdue.length) { el.innerHTML = `<div class="empty-note" style="padding:16px 18px;">Nothing overdue right now.</div>`; return; }
+  if (!overdue.length) { el.innerHTML = `<div class="empty-note" style="padding:16px 18px;">Nothing needs attention right now.</div>`; return; }
   el.innerHTML = overdue.map(r => {
     const a = state.assessors.find(x => x.id === r.assessor_id);
+    const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
     return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);">
       <div style="flex:1;">
         <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(r.seta_name)}</span></div>
-        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.role)} &middot; ${escapeHtml(r.registration_number||'no reg number')}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(roleLabel)} &middot; ${escapeHtml(r.registration_number||'no reg number')}</div>
       </div>
-      <div style="font-size:11.5px;font-weight:700;color:#E08585;">Expired ${r.registration_expiry_date}</div>
+      <div style="font-size:11.5px;font-weight:700;color:#E08585;">Inactive</div>
       <button class="btn btn-secondary btn-sm" onclick="renderDetail(${a?a.id:0})">Open profile</button>
     </div>`;
   }).join('');
