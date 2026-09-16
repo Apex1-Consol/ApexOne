@@ -729,7 +729,7 @@ function toast(type, msg){
 }
 
 // ---------- init ----------
-sb.auth.onAuthStateChange((_event, session) => { if (session) boot(); });
+sb.auth.onAuthStateChange((_event, session) => { if (session && _event !== 'INITIAL_SESSION') boot(); });
 boot();
 </script>
 </body>
