@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAM Registry — ApexOne</title>
+<link rel="icon" href="data:,">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg-primary:#0C2F52;--bg-secondary:#0A2440;--bg-card:#123458;--bg-card-hover:#1A4570;
+  --accent-primary:#1D5DA6;--accent-gold:#D4A537;--accent-emerald:#3B6D11;
+  --accent-rose:#A63A3A;--accent-cyan:#378ADD;
+  --text-primary:#F7F4EC;--text-secondary:#B7C7DA;--text-muted:#7D92AB;
+  --border-subtle:rgba(212,165,55,0.18);--border-accent:rgba(212,165,55,0.45);
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.3);--shadow-md:0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg:0 8px 24px rgba(0,0,0,0.5);
+  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;
+  --font-sans:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --font-serif:Georgia,'Times New Roman',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);min-height:100vh;}
+h1,h2{font-family:var(--font-serif);}
+a{color:var(--accent-cyan);text-decoration:none;} a:hover{color:var(--accent-gold);}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+
+/* ---- login ---- */
+#login-screen{position:fixed;inset:0;z-index:3000;background:radial-gradient(circle at top,rgba(29,93,166,0.15) 0,transparent 50%),var(--bg-primary);display:flex;align-items:center;justify-content:center;}
+.login-card{width:360px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:32px;box-shadow:var(--shadow-lg);}
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.login-brand-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--accent-gold),#B8860B);color:#0C2F52;display:flex;align-items:center;justify-content:center;font-weight:800;}
+.login-brand-name{font-size:20px;font-weight:800;font-family:var(--font-serif);}
+.login-sub{font-size:12px;color:var(--text-muted);margin-bottom:22px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:6px;}
+.field input{width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;}
+#login-error{color:var(--accent-rose);font-size:12px;min-height:16px;margin-bottom:8px;}
+
+/* ---- shell ---- */
+#app{display:none;grid-template-columns:250px 1fr;min-height:100vh;}
+.sidebar{background:linear-gradient(180deg,#0C2F52 0%,#081F38 100%);display:flex;flex-direction:column;box-shadow:4px 0 20px rgba(0,0,0,0.3);}
+.brand-section{padding:22px 20px 16px;border-bottom:1px solid rgba(212,165,55,0.18);}
+.brand-logo{font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#F7F4EC;font-family:var(--font-serif);}
+.brand-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent-gold),#B8860B);color:#0C2F52;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
+.brand-subtitle{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;margin-left:38px;}
+.standalone-flag{margin:14px 16px 0;padding:8px 10px;background:rgba(212,165,55,0.12);border:1px solid var(--border-subtle);border-radius:8px;font-size:10.5px;color:var(--text-secondary);line-height:1.4;}
+.sidebar-footer{margin-top:auto;padding:14px 18px;border-top:1px solid rgba(212,165,55,0.12);font-size:10px;color:rgba(255,255,255,0.4);display:flex;flex-direction:column;gap:8px;}
+.sidebar-footer button{background:none;border:1px solid var(--border-subtle);color:var(--text-secondary);padding:6px 10px;border-radius:6px;font-size:11px;}
+.main-canvas{min-height:100vh;}
+.top-bar{background:var(--bg-secondary);border-bottom:1px solid var(--border-subtle);padding:16px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.page-title{font-size:19px;font-weight:700;font-family:var(--font-serif);}
+.page-subtitle{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+.btn{padding:9px 16px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px;border:none;white-space:nowrap;}
+.btn-gold{background:linear-gradient(135deg,var(--accent-gold),#B8860B);color:#0C2F52;}
+.btn-secondary{background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-subtle);}
+.btn-sm{padding:6px 12px;font-size:11.5px;}
+.content{padding:22px 28px;}
+.content-container{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:18px;}
+.container-header{padding:16px 22px;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;background:var(--bg-secondary);flex-wrap:wrap;gap:8px;}
+.container-header h2{font-size:15px;font-weight:700;}
+.banner{background:rgba(212,165,55,0.12);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px 20px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:12.5px;}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:18px;}
+.stat-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:16px 18px;}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);}
+.stat-value{font-weight:800;font-size:22px;font-family:var(--font-serif);margin-top:4px;}
+
+.two-col{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start;}
+@media (max-width:1000px){.two-col{grid-template-columns:1fr;}}
+
+.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--border-subtle);}
+.tab{padding:10px 12px;font-size:12px;color:var(--text-muted);border-bottom:2px solid transparent;}
+.tab.active{color:var(--text-primary);font-weight:700;border-bottom-color:var(--accent-gold);}
+.filter-row{display:flex;gap:8px;padding:14px 18px;flex-wrap:wrap;}
+.filter-row input,.filter-row select{padding:8px 10px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;}
+.filter-row input{flex:1;min-width:180px;}
+
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);padding:8px 18px;border-bottom:1px solid var(--border-subtle);}
+td{padding:12px 18px;font-size:12.5px;border-bottom:1px solid var(--border-subtle);vertical-align:top;}
+tr.reg-row{cursor:pointer;}
+tr.reg-row:hover td{background:var(--bg-card-hover);}
+tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
+.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;flex-shrink:0;background:var(--accent-gold);}
+.name-cell{display:flex;align-items:center;gap:10px;}
+.chip{font-size:10px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;margin:1px 2px 1px 0;}
+.chip-assessor{background:rgba(55,138,221,0.18);color:#7DB6E8;}
+.chip-moderator{background:rgba(212,165,55,0.2);color:#E8C468;}
+.chip-facilitator{background:rgba(59,109,17,0.22);color:#8FC463;}
+.chip-plain{background:rgba(255,255,255,0.06);color:var(--text-secondary);border:1px solid var(--border-subtle);}
+.status-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;}
+.status-dot::before{content:'';width:6px;height:6px;border-radius:50%;}
+.status-active{color:#8FC463;} .status-active::before{background:#8FC463;}
+.status-expired{color:#E08585;} .status-expired::before{background:#E08585;}
+.status-mixed{color:#E8C468;} .status-mixed::before{background:#E8C468;}
+.status-unknown{color:var(--text-muted);} .status-unknown::before{background:var(--text-muted);}
+
+.detail-panel{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:0;position:sticky;top:18px;max-height:calc(100vh - 36px);overflow-y:auto;}
+.detail-header{padding:18px 20px;border-bottom:1px solid var(--border-subtle);display:flex;gap:12px;align-items:center;}
+.detail-body{padding:18px 20px;display:flex;flex-direction:column;gap:16px;}
+.detail-section-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle);padding-bottom:6px;margin-bottom:2px;}
+.kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;}
+.kv-grid .k{color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;}
+.reg-group{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0;margin-bottom:10px;overflow:hidden;}
+.reg-group-head{padding:10px 12px;background:var(--bg-secondary);font-weight:700;font-size:12px;display:flex;justify-content:space-between;}
+.reg-card{padding:12px;border-top:1px solid var(--border-subtle);}
+.reg-card:first-of-type{border-top:none;}
+.reg-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;}
+.progress{height:5px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;margin:6px 0;}
+.progress-fill{height:100%;}
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.doc-card{border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--bg-secondary);}
+.doc-card .name{font-weight:700;font-size:12px;}
+.doc-card .meta{font-size:10.5px;color:var(--text-muted);}
+.doc-card.missing .meta{color:var(--accent-rose);}
+.contract-banner{padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.contract-signed{background:rgba(59,109,17,0.18);color:#8FC463;}
+.contract-unsigned{background:rgba(166,58,58,0.18);color:#E08585;}
+.small-link{font-size:11px;color:var(--accent-cyan);cursor:pointer;background:none;border:none;padding:0;}
+.empty-note{font-size:11.5px;color:var(--text-muted);font-style:italic;padding:6px 0;}
+
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:2000;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{width:480px;max-width:100%;max-height:90vh;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-accent);border-radius:var(--radius-lg);padding:22px;}
+.modal h3{font-family:var(--font-serif);margin-bottom:14px;}
+.modal .field{margin-bottom:12px;}
+.modal .field label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:5px;}
+.modal .field input,.modal .field select,.modal .field textarea{width:100%;padding:9px 11px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12.5px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+.modal-error{color:var(--accent-rose);font-size:11.5px;min-height:14px;}
+
+#toast{position:fixed;bottom:20px;right:20px;z-index:4000;display:flex;flex-direction:column;gap:8px;}
+.toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
+.toast-success{background:#1f4a1a;color:#8FC463;}
+.toast-error{background:#4a1a1a;color:#E08585;}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand"><div class="login-brand-icon">A</div><div class="login-brand-name">APEX ONE</div></div>
+    <div class="login-sub">FAM Registry — standalone build. Sign in with your ApexOne account.</div>
+    <div id="login-error"></div>
+    <div class="field"><label>Email</label><input id="login-email" type="email" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input id="login-password" type="password" autocomplete="current-password"></div>
+    <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="handleLogin()">Sign in</button>
+  </div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand-section">
+      <div class="brand-logo"><div class="brand-icon">A</div>APEX ONE</div>
+      <div class="brand-subtitle">Central Hub System</div>
+    </div>
+    <div class="standalone-flag">FAM Registry — standalone build.<br>Same ApexOne account &amp; database. Will fold into the main ApexOne app once its own tab is ready.</div>
+    <div class="sidebar-footer">
+      <span id="whoami" style="color:var(--text-secondary);"></span>
+      <button onclick="handleLogout()">Sign out</button>
+      <span>FAM Registry &middot; v1.0 standalone</span>
+    </div>
+  </aside>
+
+  <main class="main-canvas">
+    <div class="top-bar">
+      <div>
+        <div class="page-title">Facilitators, Assessors &amp; Moderators</div>
+        <div class="page-subtitle">Registry &middot; scope, documents and SLA tracked per person, per SETA</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="loadAll()">&#8635; Refresh</button>
+        <button class="btn btn-gold btn-sm" onclick="openAddPractitioner()">+ Add practitioner</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="banner" id="renewal-banner" style="display:none;"></div>
+
+      <div class="stat-row" id="stat-row"></div>
+
+      <div class="two-col">
+        <div class="content-container" style="margin-bottom:0;">
+          <div class="container-header">
+            <h2>Practitioner registry</h2>
+            <span style="font-size:11px;color:var(--text-muted);">Scope, documents and SLA live in the profile panel &rarr;</span>
+          </div>
+          <div class="tabs" id="reg-tabs"></div>
+          <div class="filter-row">
+            <input id="search-box" placeholder="Search name, ID or registration number&hellip;" oninput="renderTable()">
+            <select id="role-filter" onchange="renderTable()"><option value="">All roles</option><option>Assessor</option><option>Moderator</option><option>Facilitator</option></select>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>Practitioner</th><th>Role(s)</th><th>SETA coverage</th><th>Status</th><th></th></tr></thead>
+              <tbody id="registry-tbody"><tr><td colspan="5" class="empty-note">Loading&hellip;</td></tr></tbody>
+            </table>
+          </div>
+          <div style="padding:10px 18px;font-size:11px;color:var(--text-muted);" id="registry-footer"></div>
+
+          <div class="container-header" style="margin-top:4px;">
+            <h2>Renewal action queue</h2>
+            <span style="font-size:11px;color:var(--text-muted);">Sorted by most overdue first</span>
+          </div>
+          <div id="renewal-queue"></div>
+        </div>
+
+        <div class="detail-panel" id="detail-panel">
+          <div class="empty-note" style="padding:24px;">Select a practitioner to see their full profile.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add practitioner modal -->
+<div class="modal-overlay" id="modal-practitioner">
+  <div class="modal">
+    <h3>Add practitioner</h3>
+    <div class="modal-error" id="pr-error"></div>
+    <div class="field"><label>Full name *</label><input id="pr-name"></div>
+    <div class="field"><label>ID number</label><input id="pr-idnum"></div>
+    <div class="field"><label>Email</label><input id="pr-email"></div>
+    <div class="field"><label>Phone</label><input id="pr-phone"></div>
+    <div class="field"><label>Physical address</label><input id="pr-address"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-practitioner')">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="savePractitioner()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add registration modal -->
+<div class="modal-overlay" id="modal-registration">
+  <div class="modal">
+    <h3>Add SETA registration</h3>
+    <div class="modal-error" id="rg-error"></div>
+    <input type="hidden" id="rg-assessor-id">
+    <div class="field"><label>SETA name *</label><input id="rg-seta" placeholder="e.g. BANKSETA"></div>
+    <div class="field"><label>Role *</label>
+      <select id="rg-role"><option>Assessor</option><option>Moderator</option><option>Facilitator</option></select>
+    </div>
+    <div class="field"><label>Registration number</label><input id="rg-regnum"></div>
+    <div class="field"><label>Expiry date</label><input id="rg-expiry" type="date"></div>
+    <div class="field"><label>Training provider(s)</label><input id="rg-providers"></div>
+    <div class="field"><label>Scope &mdash; qualifications covered</label>
+      <select id="rg-scope" multiple size="4"></select>
+      <div style="font-size:10.5px;color:var(--text-muted);margin-top:4px;">Cmd/Ctrl-click to select more than one. New qualifications can be added from the Programmes tab in ApexOne.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-registration')">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="saveRegistration()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add document modal -->
+<div class="modal-overlay" id="modal-document">
+  <div class="modal">
+    <h3>Add / update document</h3>
+    <div class="modal-error" id="dc-error"></div>
+    <input type="hidden" id="dc-assessor-id">
+    <div class="field"><label>Document type *</label><input id="dc-type" placeholder="e.g. CV, ID document, SLA agreement, Code of conduct"></div>
+    <div class="field"><label>Status *</label>
+      <select id="dc-status"><option>Missing</option><option>Current</option><option>Verified</option><option>Signed</option><option>Expired</option></select>
+    </div>
+    <div class="field"><label>Date</label><input id="dc-date" type="date"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-document')">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="saveDocument()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Contract modal -->
+<div class="modal-overlay" id="modal-contract">
+  <div class="modal">
+    <h3>Contract / SLA status</h3>
+    <div class="modal-error" id="ct-error"></div>
+    <input type="hidden" id="ct-assessor-id">
+    <div class="field"><label>SLA status *</label>
+      <select id="ct-status"><option>Not signed</option><option>Signed</option><option>Expired</option></select>
+    </div>
+    <div class="field"><label>Signed date</label><input id="ct-date" type="date"></div>
+    <div class="field"><label>Provider name(s)</label><input id="ct-providers"></div>
+    <div class="field"><label>Notes</label><textarea id="ct-notes" rows="3"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-contract')">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="saveContract()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPA_URL  = 'https://nducwhlmudksgxggjrbo.supabase.co';
+const SUPA_ANON = 'sb_publishable_G2BvFAbvXlrq9nwIl4Gupw_3qyTRe2b';
+const sb = window.supabase.createClient(SUPA_URL, SUPA_ANON);
+
+let state = {
+  assessors: [],       // practitioner rows
+  registrations: [],   // fam_seta_registrations, each with .scope[] (qualification rows) attached
+  documents: [],
+  contracts: [],
+  qualifications: [],
+  selectedAssessorId: null,
+  activeTab: 'all',
+  tenantId: null,
+};
+
+// ---------- auth ----------
+async function handleLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = error.message; return; }
+  await boot();
+}
+async function handleLogout(){ await sb.auth.signOut(); location.reload(); }
+
+async function boot(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'grid';
+  const meta = session.user.app_metadata || {};
+  state.tenantId = meta.tenant || null;
+  document.getElementById('whoami').textContent = session.user.email + (meta.role ? ' · ' + meta.role : '');
+  await loadAll();
+}
+
+function authHeaders(){
+  return sb.auth.getSession().then(({ data: { session } }) => ({
+    'apikey': SUPA_ANON,
+    'Authorization': 'Bearer ' + (session ? session.access_token : SUPA_ANON),
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  }));
+}
+async function api(path, opts = {}){
+  const headers = await authHeaders();
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { ...opts, headers: { ...headers, ...(opts.headers||{}) } });
+  if (!res.ok) { const t = await res.text(); throw new Error(t || res.statusText); }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ---------- data load ----------
+async function loadAll(){
+  try {
+    const [assessors, regs, scope, docs, contracts, quals] = await Promise.all([
+      api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
+      api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
+      api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
+      api('fam_documents?select=*'),
+      api('fam_contracts?select=*'),
+      api('qualifications?select=id,name,qualification_code&order=name.asc'),
+    ]);
+    state.assessors = assessors || [];
+    state.documents = docs || [];
+    state.contracts = contracts || [];
+    state.qualifications = quals || [];
+    const scopeByReg = {};
+    (scope||[]).forEach(s => { (scopeByReg[s.registration_id] ||= []).push(s); });
+    state.registrations = (regs||[]).map(r => ({ ...r, scope: scopeByReg[r.id] || [] }));
+
+    const sel = document.getElementById('rg-scope');
+    sel.innerHTML = state.qualifications.map(q => `<option value="${q.id}">${escapeHtml(q.name)}</option>`).join('');
+
+    renderStats();
+    renderTabs();
+    renderTable();
+    renderRenewalQueue();
+    if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
+  } catch (e) {
+    console.error(e);
+    toast('error', 'Failed to load FAM Registry data: ' + e.message);
+  }
+}
+
+// ---------- derived helpers ----------
+function regStatus(r){
+  if (!r.registration_expiry_date) return 'unknown';
+  return new Date(r.registration_expiry_date) < new Date() ? 'expired' : 'active';
+}
+function regsFor(assessorId){ return state.registrations.filter(r => String(r.assessor_id) === String(assessorId)); }
+function overallStatus(assessorId){
+  const regs = regsFor(assessorId);
+  if (!regs.length) return 'unknown';
+  const statuses = new Set(regs.map(regStatus));
+  if (statuses.size === 1) return [...statuses][0];
+  return 'mixed';
+}
+function rolesFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.role))]; }
+function setasFor(assessorId){ return [...new Set(regsFor(assessorId).map(r => r.seta_name))]; }
+function daysUntil(d){ return Math.ceil((new Date(d) - new Date()) / 86400000); }
+
+function statusPillHtml(status){
+  const map = { active:['status-active','Active'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
+  const [cls,label] = map[status] || map.unknown;
+  return `<span class="status-dot ${cls}">${label}</span>`;
+}
+function roleChipHtml(role){
+  const cls = role === 'Assessor' ? 'chip-assessor' : role === 'Moderator' ? 'chip-moderator' : 'chip-facilitator';
+  return `<span class="chip ${cls}">${escapeHtml(role)}</span>`;
+}
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- render: stats + banner ----------
+function renderStats(){
+  const total = state.assessors.length;
+  const totalRegs = state.registrations.length;
+  const active = state.registrations.filter(r => regStatus(r) === 'active').length;
+  const expired = state.registrations.filter(r => regStatus(r) === 'expired').length;
+  const setas = new Set(state.registrations.map(r => r.seta_name)).size;
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Practitioners</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Total registrations</div><div class="stat-value">${totalRegs}</div></div>
+    <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:#8FC463;">${active}</div></div>
+    <div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value" style="color:#E08585;">${expired}</div></div>
+    <div class="stat-card"><div class="stat-label">SETA coverage</div><div class="stat-value">${setas}</div></div>`;
+  const banner = document.getElementById('renewal-banner');
+  if (expired > 0) {
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span><strong>${expired}</strong> registration${expired===1?'':'s'} need${expired===1?'s':''} renewal</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
+  } else banner.style.display = 'none';
+}
+
+function renderTabs(){
+  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
+  const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
+  const tabs = [
+    ['all', `All practitioners (${state.assessors.length})`],
+    ['attention', `Needs attention (${needsAttention})`],
+    ['active', `Active only (${activeOnly})`],
+  ];
+  document.getElementById('reg-tabs').innerHTML = tabs.map(([key,label]) =>
+    `<div class="tab ${state.activeTab===key?'active':''}" onclick="setTab('${key}')">${label}</div>`).join('');
+}
+function setTab(key){ state.activeTab = key; renderTabs(); renderTable(); }
+
+// ---------- render: table ----------
+function renderTable(){
+  const search = (document.getElementById('search-box').value || '').toLowerCase();
+  const roleFilter = document.getElementById('role-filter').value;
+  let rows = state.assessors.filter(a => {
+    const status = overallStatus(a.id);
+    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
+    if (state.activeTab === 'active' && status !== 'active') return false;
+    if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
+    if (search) {
+      const hay = [a.full_name, a.id_number, ...regsFor(a.id).map(r=>r.registration_number)].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  const tbody = document.getElementById('registry-tbody');
+  if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-note">No practitioners match this view.</td></tr>`; document.getElementById('registry-footer').textContent=''; return; }
+  tbody.innerHTML = rows.map(a => {
+    const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const roles = rolesFor(a.id);
+    const setas = setasFor(a.id);
+    return `<tr class="reg-row ${state.selectedAssessorId==a.id?'selected':''}" onclick="renderDetail(${a.id})">
+      <td><div class="name-cell"><div class="avatar">${initials}</div><div><strong>${escapeHtml(a.full_name)}</strong><br><span style="color:var(--text-muted);font-size:10.5px;">${a.id_number?escapeHtml(a.id_number):'ID not captured'}</span></div></div></td>
+      <td>${roles.length ? roles.map(roleChipHtml).join('') : '<span class="empty-note">No role yet</span>'}</td>
+      <td>${setas.length ? setas.map(s=>`<span class="chip chip-plain">${escapeHtml(s)}</span>`).join('') : '<span class="empty-note">Not registered</span>'}</td>
+      <td>${statusPillHtml(overallStatus(a.id))}</td>
+      <td><a onclick="event.stopPropagation();renderDetail(${a.id})">&rarr;</a></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('registry-footer').textContent = `${rows.length} practitioner${rows.length===1?'':'s'} shown · scope, documents and SLA in profile`;
+}
+
+// ---------- render: renewal queue ----------
+function renderRenewalQueue(){
+  const overdue = state.registrations
+    .filter(r => regStatus(r) === 'expired')
+    .sort((a,b) => new Date(a.registration_expiry_date) - new Date(b.registration_expiry_date))
+    .slice(0, 8);
+  const el = document.getElementById('renewal-queue');
+  if (!overdue.length) { el.innerHTML = `<div class="empty-note" style="padding:16px 18px;">Nothing overdue right now.</div>`; return; }
+  el.innerHTML = overdue.map(r => {
+    const a = state.assessors.find(x => x.id === r.assessor_id);
+    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);">
+      <div style="flex:1;">
+        <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(r.seta_name)}</span></div>
+        <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(r.role)} &middot; ${escapeHtml(r.registration_number||'no reg number')}</div>
+      </div>
+      <div style="font-size:11.5px;font-weight:700;color:#E08585;">Expired ${r.registration_expiry_date}</div>
+      <button class="btn btn-secondary btn-sm" onclick="renderDetail(${a?a.id:0})">Open profile</button>
+    </div>`;
+  }).join('');
+}
+
+// ---------- render: detail panel ----------
+function renderDetail(assessorId){
+  state.selectedAssessorId = assessorId;
+  renderTable();
+  const a = state.assessors.find(x => x.id === assessorId);
+  const panel = document.getElementById('detail-panel');
+  if (!a) { panel.innerHTML = `<div class="empty-note" style="padding:24px;">Practitioner not found.</div>`; return; }
+
+  const regs = regsFor(assessorId);
+  const bySeta = {};
+  regs.forEach(r => { (bySeta[r.seta_name] ||= []).push(r); });
+
+  const regsHtml = Object.keys(bySeta).length ? Object.entries(bySeta).map(([seta, list]) => `
+    <div class="reg-group">
+      <div class="reg-group-head"><span>${escapeHtml(seta)}</span><span style="color:var(--text-muted);font-weight:400;">${list.length} reg${list.length===1?'':'s'}</span></div>
+      ${list.map(r => {
+        const status = regStatus(r);
+        const pct = status === 'expired' ? 100 : (r.registration_expiry_date ? Math.max(8, 100 - Math.min(100, daysUntil(r.registration_expiry_date)/730*100)) : 30);
+        return `<div class="reg-card">
+          <div class="reg-card-top"><span><strong>${escapeHtml(r.role)}</strong> &middot; ${escapeHtml(r.registration_number||'no reg number')}</span>${statusPillHtml(status)}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${r.registration_expiry_date ? 'Expiry '+r.registration_expiry_date : 'No expiry captured'}</div>
+          <div class="progress"><div class="progress-fill" style="width:${pct}%;background:${status==='expired'?'#A63A3A':'#3B6D11'};"></div></div>
+          <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
+          ${r.training_providers ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px;">Training provider(s): ${escapeHtml(r.training_providers)}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
+
+  const docs = state.documents.filter(d => d.assessor_id === assessorId);
+  const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => `
+      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div></div>`).join('')}</div>`
+    : `<div class="empty-note">No documents captured yet.</div>`;
+
+  const contract = state.contracts.find(c => c.assessor_id === assessorId);
+  const contractHtml = contract
+    ? `<div class="contract-banner ${contract.sla_status==='Signed'?'contract-signed':'contract-unsigned'}">${escapeHtml(contract.sla_status)}${contract.signed_date?' · '+contract.signed_date:''}</div>`
+    : `<div class="empty-note">No contract on file.</div>`;
+
+  const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div class="avatar" style="width:48px;height:48px;font-size:16px;">${initials}</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:15px;font-family:var(--font-serif);">${escapeHtml(a.full_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${a.id_number?escapeHtml(a.id_number):'ID not captured'}</div>
+      </div>
+      ${statusPillHtml(overallStatus(assessorId))}
+    </div>
+    <div class="detail-body">
+      <div>
+        <div class="detail-section-title">Contact record</div>
+        <div class="kv-grid" style="margin-top:8px;">
+          <div><div class="k">Phone</div>${a.phone?escapeHtml(a.phone):'&mdash;'}</div>
+          <div><div class="k">Email</div>${a.email?escapeHtml(a.email):'&mdash;'}</div>
+          <div style="grid-column:1/-1;"><div class="k">Address</div>${a.physical_address?escapeHtml(a.physical_address):'&mdash;'}</div>
+        </div>
+      </div>
+      <div>
+        <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Registrations &amp; scope</span>
+          <button class="small-link" onclick="openAddRegistration(${assessorId})">+ Add registration</button>
+        </div>
+        <div style="margin-top:8px;">${regsHtml}</div>
+      </div>
+      <div>
+        <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Supporting documents</span>
+          <button class="small-link" onclick="openAddDocument(${assessorId})">+ Add document</button>
+        </div>
+        <div style="margin-top:8px;">${docsHtml}</div>
+      </div>
+      <div>
+        <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Contract</span>
+          <button class="small-link" onclick="openContract(${assessorId})">Edit</button>
+        </div>
+        <div style="margin-top:8px;">${contractHtml}</div>
+      </div>
+    </div>`;
+}
+
+// ---------- modals ----------
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function openAddPractitioner(){
+  ['pr-name','pr-idnum','pr-email','pr-phone','pr-address'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pr-error').textContent = '';
+  openModal('modal-practitioner');
+}
+async function savePractitioner(){
+  const name = document.getElementById('pr-name').value.trim();
+  if (!name) { document.getElementById('pr-error').textContent = 'Full name is required.'; return; }
+  if (!state.tenantId) { document.getElementById('pr-error').textContent = 'No tenant on your account — contact an admin.'; return; }
+  try {
+    await api('assessors', { method:'POST', body: JSON.stringify({
+      tenant_id: state.tenantId,
+      full_name: name,
+      id_number: document.getElementById('pr-idnum').value || null,
+      email: document.getElementById('pr-email').value || null,
+      phone: document.getElementById('pr-phone').value || null,
+      physical_address: document.getElementById('pr-address').value || null,
+    })});
+    closeModal('modal-practitioner');
+    toast('success','Practitioner added.');
+    await loadAll();
+  } catch(e){ document.getElementById('pr-error').textContent = 'Failed to save: ' + e.message; }
+}
+
+function openAddRegistration(assessorId){
+  document.getElementById('rg-assessor-id').value = assessorId;
+  document.getElementById('rg-seta').value = '';
+  document.getElementById('rg-regnum').value = '';
+  document.getElementById('rg-expiry').value = '';
+  document.getElementById('rg-providers').value = '';
+  document.getElementById('rg-error').textContent = '';
+  openModal('modal-registration');
+}
+async function saveRegistration(){
+  const assessorId = document.getElementById('rg-assessor-id').value;
+  const seta = document.getElementById('rg-seta').value.trim();
+  const role = document.getElementById('rg-role').value;
+  if (!seta) { document.getElementById('rg-error').textContent = 'SETA name is required.'; return; }
+  if (!state.tenantId) { document.getElementById('rg-error').textContent = 'No tenant on your account.'; return; }
+  const scopeIds = [...document.getElementById('rg-scope').selectedOptions].map(o => o.value);
+  try {
+    const [created] = await api('fam_seta_registrations', { method:'POST', body: JSON.stringify({
+      tenant_id: state.tenantId,
+      assessor_id: Number(assessorId),
+      seta_name: seta,
+      role,
+      registration_number: document.getElementById('rg-regnum').value || null,
+      registration_expiry_date: document.getElementById('rg-expiry').value || null,
+      training_providers: document.getElementById('rg-providers').value || null,
+    })});
+    if (scopeIds.length) {
+      await api('fam_registration_scope', { method:'POST', body: JSON.stringify(
+        scopeIds.map(qid => ({ tenant_id: state.tenantId, registration_id: created.id, qualification_id: qid }))
+      )});
+    }
+    closeModal('modal-registration');
+    toast('success','Registration added.');
+    await loadAll();
+    renderDetail(Number(assessorId));
+  } catch(e){ document.getElementById('rg-error').textContent = 'Failed to save: ' + e.message; }
+}
+
+function openAddDocument(assessorId){
+  document.getElementById('dc-assessor-id').value = assessorId;
+  document.getElementById('dc-type').value = '';
+  document.getElementById('dc-status').value = 'Missing';
+  document.getElementById('dc-date').value = '';
+  document.getElementById('dc-error').textContent = '';
+  openModal('modal-document');
+}
+async function saveDocument(){
+  const assessorId = document.getElementById('dc-assessor-id').value;
+  const docType = document.getElementById('dc-type').value.trim();
+  if (!docType) { document.getElementById('dc-error').textContent = 'Document type is required.'; return; }
+  if (!state.tenantId) { document.getElementById('dc-error').textContent = 'No tenant on your account.'; return; }
+  try {
+    await api('fam_documents', { method:'POST', body: JSON.stringify({
+      tenant_id: state.tenantId,
+      assessor_id: Number(assessorId),
+      doc_type: docType,
+      status: document.getElementById('dc-status').value,
+      doc_date: document.getElementById('dc-date').value || null,
+    })});
+    closeModal('modal-document');
+    toast('success','Document saved.');
+    await loadAll();
+    renderDetail(Number(assessorId));
+  } catch(e){ document.getElementById('dc-error').textContent = 'Failed to save: ' + e.message; }
+}
+
+function openContract(assessorId){
+  const existing = state.contracts.find(c => c.assessor_id === assessorId);
+  document.getElementById('ct-assessor-id').value = assessorId;
+  document.getElementById('ct-status').value = existing ? existing.sla_status : 'Not signed';
+  document.getElementById('ct-date').value = existing ? (existing.signed_date||'') : '';
+  document.getElementById('ct-providers').value = existing ? (existing.provider_names||'') : '';
+  document.getElementById('ct-notes').value = existing ? (existing.notes||'') : '';
+  document.getElementById('ct-error').textContent = '';
+  openModal('modal-contract');
+}
+async function saveContract(){
+  const assessorId = Number(document.getElementById('ct-assessor-id').value);
+  if (!state.tenantId) { document.getElementById('ct-error').textContent = 'No tenant on your account.'; return; }
+  const existing = state.contracts.find(c => c.assessor_id === assessorId);
+  const body = {
+    tenant_id: state.tenantId,
+    assessor_id: assessorId,
+    sla_status: document.getElementById('ct-status').value,
+    signed_date: document.getElementById('ct-date').value || null,
+    provider_names: document.getElementById('ct-providers').value || null,
+    notes: document.getElementById('ct-notes').value || null,
+  };
+  try {
+    if (existing) await api(`fam_contracts?id=eq.${existing.id}`, { method:'PATCH', body: JSON.stringify(body) });
+    else await api('fam_contracts', { method:'POST', body: JSON.stringify(body) });
+    closeModal('modal-contract');
+    toast('success','Contract updated.');
+    await loadAll();
+    renderDetail(assessorId);
+  } catch(e){ document.getElementById('ct-error').textContent = 'Failed to save: ' + e.message; }
+}
+
+// ---------- toast ----------
+function toast(type, msg){
+  const el = document.createElement('div');
+  el.className = 'toast-item toast-' + type;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ---------- init ----------
+sb.auth.onAuthStateChange((_event, session) => { if (session) boot(); });
+boot();
+</script>
+</body>
+</html>
