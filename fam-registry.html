@@ -296,10 +296,22 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
       <select id="dc-status"><option>Missing</option><option>Current</option></select>
     </div>
     <div class="field"><label>Date loaded</label><input id="dc-date" type="date"></div>
+    <div class="field"><label>Expiry date</label><input id="dc-expiry" type="date"></div>
     <div class="field"><label>Upload file</label><input id="dc-file" type="file"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-document')">Cancel</button>
       <button class="btn btn-gold btn-sm" onclick="saveDocument()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Document verification history modal -->
+<div class="modal-overlay" id="modal-doc-history">
+  <div class="modal">
+    <h3>Verification history</h3>
+    <div id="dh-body" style="max-height:320px;overflow:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-doc-history')">Close</button>
     </div>
   </div>
 </div>
@@ -622,8 +634,22 @@ function renderDetail(assessorId){
     </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
 
   const docs = state.documents.filter(d => d.assessor_id === assessorId);
-  const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => `
-      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>${d.file_url?`<div style="margin-top:4px;"><button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button></div>`:''}</div>`).join('')}</div>`
+  const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => {
+      const expiryNote = d.expiry_date ? `${docExpiryBadge(d.expiry_date)} Expires ${d.expiry_date}` : '';
+      const fileNote = d.file_name ? `${escapeHtml(d.file_name)}${d.file_size_bytes?' · '+formatFileSize(d.file_size_bytes):''}` : '';
+      const uploaderNote = d.uploaded_by ? `Uploaded by ${escapeHtml(d.uploaded_by)}${d.uploaded_at?' · '+new Date(d.uploaded_at).toLocaleDateString():''}` : '';
+      return `<div class="doc-card ${d.status==='Missing'?'missing':''}">
+        <div class="name">${escapeHtml(d.doc_type)}</div>
+        <div class="meta">${escapeHtml(d.status)}${d.doc_date?' · loaded '+d.doc_date:''}</div>
+        ${expiryNote?`<div class="meta">${expiryNote}</div>`:''}
+        ${fileNote?`<div class="meta" style="opacity:.8;">${fileNote}</div>`:''}
+        ${uploaderNote?`<div class="meta" style="opacity:.65;font-size:11px;">${uploaderNote}</div>`:''}
+        <div style="margin-top:4px;display:flex;gap:10px;">
+          ${d.file_url?`<button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button>`:''}
+          <button class="small-link" onclick="openDocHistory(${d.id})">History</button>
+        </div>
+      </div>`;
+    }).join('')}</div>`
     : `<div class="empty-note">No documents captured yet.</div>`;
 
   const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -732,6 +758,7 @@ function openAddDocument(assessorId){
   document.getElementById('dc-type').value = 'CV';
   document.getElementById('dc-status').value = 'Missing';
   document.getElementById('dc-date').value = '';
+  document.getElementById('dc-expiry').value = '';
   document.getElementById('dc-file').value = '';
   document.getElementById('dc-error').textContent = '';
   openModal('modal-document');
@@ -749,8 +776,10 @@ async function uploadDocumentFile(file, tenantId, assessorId){
     body: file,
   });
   if (!res.ok) throw new Error('File upload failed: ' + (await res.text()));
-  return path; // fam_documents.file_url now stores the storage object path, not a public URL —
-               // the bucket is private, so viewing goes through viewDocument()'s signed URL below.
+  // fam_documents.file_url stores the storage object path, not a public URL — the bucket
+  // is private, so viewing goes through viewDocument()'s signed URL below. Returning the
+  // file's own metadata alongside the path so the caller can persist it on fam_documents.
+  return { path, name: file.name, size: file.size, type: file.type || 'application/octet-stream' };
 }
 async function viewDocument(path){
   try {
@@ -758,6 +787,34 @@ async function viewDocument(path){
     if (error) throw error;
     window.open(data.signedUrl, '_blank', 'noopener');
   } catch(e) { toast('error', 'Could not open file: ' + e.message); }
+}
+function formatFileSize(bytes){
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+function docExpiryBadge(expiryDate){
+  const days = Math.floor((new Date(expiryDate) - new Date()) / 86400000);
+  if (days < 0) return '<span class="status-dot status-expired">Expired</span>';
+  if (days <= 60) return '<span class="status-dot status-mixed">Due soon</span>';
+  return '';
+}
+async function openDocHistory(documentId){
+  const body = document.getElementById('dh-body');
+  body.innerHTML = '<div class="empty-note">Loading…</div>';
+  openModal('modal-doc-history');
+  try {
+    const rows = await api(`fam_document_verifications?document_id=eq.${documentId}&select=*&order=verified_at.desc`);
+    body.innerHTML = (rows && rows.length) ? rows.map(r => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--border-subtle,#e5e5e5);">
+        <div style="font-weight:600;font-size:12.5px;">${escapeHtml(r.status)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${new Date(r.verified_at).toLocaleString()}${r.verified_by?' · '+escapeHtml(r.verified_by):''}</div>
+        ${r.notes?`<div style="font-size:12px;margin-top:2px;">${escapeHtml(r.notes)}</div>`:''}
+      </div>`).join('') : '<div class="empty-note">No history recorded yet.</div>';
+  } catch(e) {
+    body.innerHTML = '<div class="empty-note">Failed to load history: ' + escapeHtml(e.message) + '</div>';
+  }
 }
 async function saveDocument(){
   const assessorId = document.getElementById('dc-assessor-id').value;
@@ -767,17 +824,26 @@ async function saveDocument(){
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
     const fileInput = document.getElementById('dc-file');
-    let fileUrl = null;
+    let uploaded = null;
     if (fileInput.files && fileInput.files[0]) {
-      fileUrl = await uploadDocumentFile(fileInput.files[0], state.tenantId, assessorId);
+      uploaded = await uploadDocumentFile(fileInput.files[0], state.tenantId, assessorId);
     }
+    const { data: { user } } = await sb.auth.getUser();
     await api('fam_documents', { method:'POST', body: JSON.stringify({
       tenant_id: state.tenantId,
       assessor_id: Number(assessorId),
       doc_type: docType,
       status: document.getElementById('dc-status').value,
       doc_date: document.getElementById('dc-date').value || null,
-      ...(fileUrl ? { file_url: fileUrl } : {}),
+      expiry_date: document.getElementById('dc-expiry').value || null,
+      ...(uploaded ? {
+        file_url: uploaded.path,
+        file_name: uploaded.name,
+        file_size_bytes: uploaded.size,
+        mime_type: uploaded.type,
+        uploaded_by: user ? user.email : null,
+        uploaded_at: new Date().toISOString(),
+      } : {}),
     })});
     closeModal('modal-document');
     toast('success','Document saved.');
