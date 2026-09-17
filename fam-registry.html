@@ -323,7 +323,13 @@ let state = {
   qualifications: [],
   followUps: [],        // fam_follow_ups — durable claim/dismiss/notes state for action-queue items
   showDismissedFollowUps: false,
-  selectedAssessorId: null,
+  // Deep-link support: index.html's Assessors tab links here as
+  // fam-registry.html?assessor=<id> to open a specific practitioner directly.
+  selectedAssessorId: (() => {
+    const raw = new URLSearchParams(location.search).get('assessor');
+    const n = raw ? Number(raw) : null;
+    return Number.isFinite(n) ? n : null;
+  })(),
   activeTab: 'all',
   tenantId: null,
 };
