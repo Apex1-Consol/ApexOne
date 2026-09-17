@@ -1248,9 +1248,10 @@
                                 <th>Qualification(s)</th>
                                 <th>Expiry Date</th>
                                 <th>Status</th>
+                                <th>FAM Status</th>
                                 <th>Actions</th>
                             </tr></thead>
-                            <tbody id="tbody-assessors"><tr><td colspan="9" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No assessors yet — use the Add Person button.</td></tr></tbody>
+                            <tbody id="tbody-assessors"><tr><td colspan="10" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No assessors yet — use the Add Person button.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -5204,15 +5205,60 @@ async function saveEditClient() {
 }
 
 // ===================== ASSESSOR / MODERATOR REGISTER =====================
+// FAM Registry integration: pulls the pre-computed per-practitioner aggregate
+// status (Active/Expired/Mixed/Inactive/Unknown) from v_fam_assessor_status
+// (see supabase/migrations/20260917060900_fam_full_status_derivation.sql).
+// This is additive only — it does not touch the legacy Status/Expiry fields
+// on the assessors table or anything else that reads them.
+async function fetchFamAssessorStatusMap() {
+    const map = {};
+    try {
+        const url = `${SUPA_URL}/rest/v1/v_fam_assessor_status?select=assessor_id,overall_status`;
+        const res = await fetch(url, { headers: await supaHeaders() });
+        if (!res.ok) {
+            console.error('FAM status fetch error:', res.status, await res.text());
+            return map;
+        }
+        const rows = await res.json();
+        rows.forEach(row => { map[String(row.assessor_id)] = row.overall_status; });
+    } catch (e) {
+        console.error('FAM status fetch failed:', e);
+    }
+    return map;
+}
+
+const FAM_STATUS_STYLE = {
+    'Active':   { color: '#8FC463', label: 'Active' },
+    'Expired':  { color: '#E08585', label: 'Expired' },
+    'Mixed':    { color: '#E8C468', label: 'Mixed' },
+    'Inactive': { color: '#E08585', label: 'Inactive' },
+    'Unknown':  { color: 'var(--text-muted)', label: 'Unknown' }
+};
+
+function famStatusBadgeHtml(status, assessorId) {
+    if (!status) {
+        return '<span style="color:var(--text-muted);font-size:11px;font-style:italic;">No FAM data</span>';
+    }
+    const s = FAM_STATUS_STYLE[status] || { color: 'var(--text-muted)', label: status };
+    return `<a href="fam-registry.html?assessor=${encodeURIComponent(assessorId)}" target="_blank"
+        style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:${s.color};text-decoration:none;"
+        title="Open ${escapeHtml(s.label)} record in FAM Registry">
+        <span style="width:6px;height:6px;border-radius:50%;background:${s.color};display:inline-block;"></span>${escapeHtml(s.label)}
+    </a>`;
+}
+
 async function loadAssessors() {
     try {
-        const records = await fetchRecords('Assessors');
+        const [records, famStatusMap] = await Promise.all([
+            fetchRecords('Assessors'),
+            fetchFamAssessorStatusMap()
+        ]);
         state.assessors = records;
         const tbody = document.getElementById('tbody-assessors');
         if (!tbody) return;
         tbody.innerHTML = '';
         if (!records.length) {
-            tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No assessors yet — use the Add Person button.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No assessors yet — use the Add Person button.</td></tr>';
             ['assessors-total','assessors-active','assessors-expiring'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
             return;
         }
@@ -5249,6 +5295,7 @@ async function loadAssessors() {
                 <td data-label="Qualifications">${escapeHtml(f['Qualifications']||'')}</td>
                 <td data-label="Expiry" style="color:${expiryColor};">${escapeHtml(expiryDisplay)}</td>
                 <td data-label="Status" style="color:${statusColor};font-weight:600;">${escapeHtml(status||'—')}</td>
+                <td data-label="FAM Status">${famStatusBadgeHtml(famStatusMap[String(r.id)], r.id)}</td>
                 <td data-label="Actions">
                     <button class="btn btn-gold btn-sm" onclick="openEditAssessor('${r.id}')">Edit</button>
                     <button class="btn btn-secondary btn-sm" onclick="deleteRow('Assessors','${r.id}',loadAssessors)">Del</button>
