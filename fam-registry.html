@@ -301,7 +301,9 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
       <select id="dc-status"><option>Missing</option><option>Current</option></select>
     </div>
     <div class="field"><label>Date loaded</label><input id="dc-date" type="date"></div>
-    <div class="field"><label>Upload file</label><input id="dc-file" type="file"></div>
+    <div class="field"><label>Upload file</label><input id="dc-file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">PDF, Word, or image (JPG/PNG) — up to 10 MB.</div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-document')">Cancel</button>
       <button class="btn btn-gold btn-sm" onclick="saveDocument()">Save</button>
@@ -831,7 +833,33 @@ function openAddDocument(assessorId){
   document.getElementById('dc-error').textContent = '';
   openModal('modal-document');
 }
+// Kept in sync with the fam-documents bucket's own file_size_limit / allowed_mime_types
+// (set at the storage layer too, so this is a friendly first check, not the only guard).
+const MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_DOC_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+];
+const ALLOWED_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+
+function validateDocumentFile(file){
+  if (file.size > MAX_DOC_SIZE_BYTES) {
+    throw new Error(`File is too large (${(file.size/1024/1024).toFixed(1)} MB) — the limit is 10 MB.`);
+  }
+  // Some browsers/OSes leave file.type blank for certain files, so fall back to
+  // checking the extension rather than rejecting a legitimate upload outright.
+  const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+  const typeOk = file.type ? ALLOWED_DOC_MIME_TYPES.includes(file.type) : ALLOWED_DOC_EXTENSIONS.includes(ext);
+  if (!typeOk) {
+    throw new Error('Unsupported file type — please upload a PDF, Word document, or JPG/PNG image.');
+  }
+}
+
 async function uploadDocumentFile(file, tenantId, assessorId){
+  validateDocumentFile(file);
   const path = `${tenantId}/${assessorId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
   const { data: { session } } = await sb.auth.getSession();
   const res = await fetch(`${SUPA_URL}/storage/v1/object/fam-documents/${path}`, {
@@ -862,9 +890,15 @@ async function saveDocument(){
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
     const fileInput = document.getElementById('dc-file');
+    const file = fileInput.files && fileInput.files[0];
     let fileUrl = null;
-    if (fileInput.files && fileInput.files[0]) {
-      fileUrl = await uploadDocumentFile(fileInput.files[0], state.tenantId, assessorId);
+    if (file) {
+      fileUrl = await uploadDocumentFile(file, state.tenantId, assessorId);
+    }
+    let uploaderEmail = null;
+    if (file) {
+      const { data: { user } } = await sb.auth.getUser();
+      uploaderEmail = user ? user.email : null;
     }
     await api('fam_documents', { method:'POST', body: JSON.stringify({
       tenant_id: state.tenantId,
@@ -872,7 +906,14 @@ async function saveDocument(){
       doc_type: docType,
       status: document.getElementById('dc-status').value,
       doc_date: document.getElementById('dc-date').value || null,
-      ...(fileUrl ? { file_url: fileUrl } : {}),
+      ...(fileUrl ? {
+        file_url: fileUrl,
+        file_name: file.name,
+        file_size_bytes: file.size,
+        mime_type: file.type || null,
+        uploaded_by: uploaderEmail,
+        uploaded_at: new Date().toISOString(),
+      } : {}),
     })});
     closeModal('modal-document');
     toast('success','Document saved.');
