@@ -226,8 +226,12 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 
           <div class="container-header" style="margin-top:4px;">
             <h2>Action queue</h2>
-            <span style="font-size:11px;color:var(--text-muted);">Expired, due &le;60 days, pending entry or missing documents &middot; most urgent first</span>
+            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="queue-show-dismissed" onchange="state.showDismissedFollowUps=this.checked;renderRenewalQueue();">
+              Show dismissed
+            </label>
           </div>
+          <div style="padding:0 18px 10px;font-size:11px;color:var(--text-muted);">Expired, due &le;60 days, pending entry or missing documents &middot; most urgent first</div>
           <div id="renewal-queue"></div>
         </div>
 
@@ -316,6 +320,8 @@ let state = {
   registrations: [],   // fam_seta_registrations, each with .scope[] (qualification rows) attached
   documents: [],
   qualifications: [],
+  followUps: [],        // fam_follow_ups — durable claim/dismiss/notes state for action-queue items
+  showDismissedFollowUps: false,
   selectedAssessorId: null,
   activeTab: 'all',
   tenantId: null,
@@ -381,16 +387,18 @@ async function api(path, opts = {}){
 // ---------- data load ----------
 async function loadAll(){
   try {
-    const [assessors, regs, scope, docs, quals] = await Promise.all([
+    const [assessors, regs, scope, docs, quals, followUps] = await Promise.all([
       api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
       api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
       api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
       api('fam_documents?select=*'),
       api('qualifications?select=id,name,qualification_code,seta&order=name.asc'),
+      api('fam_follow_ups?select=*&status=neq.Done'),
     ]);
     state.assessors = assessors || [];
     state.documents = docs || [];
     state.qualifications = quals || [];
+    state.followUps = followUps || [];
     const scopeByReg = {};
     (scope||[]).forEach(s => { (scopeByReg[s.registration_id] ||= []).push(s); });
     state.registrations = (regs||[]).map(r => ({ ...r, scope: scopeByReg[r.id] || [] }));
@@ -557,6 +565,61 @@ function riskBadgeHtml(kind, days){
   const m = map[kind] || map.inactive;
   return `<div style="font-size:11.5px;font-weight:700;${m.cls}white-space:nowrap;">${m.label}</div>`;
 }
+function followUpFor(sourceType, sourceId){
+  return state.followUps.find(f => f.source_type === sourceType && String(f.source_id) === String(sourceId));
+}
+async function upsertFollowUp(sourceType, sourceId, assessorId, kind, fields){
+  if (!state.tenantId) { toast('error','No tenant on your account.'); return; }
+  const body = {
+    tenant_id: state.tenantId,
+    assessor_id: assessorId,
+    source_type: sourceType,
+    source_id: sourceId,
+    kind,
+    ...fields,
+  };
+  try {
+    await api(`fam_follow_ups?on_conflict=tenant_id,assessor_id,source_type,source_id`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(body),
+    });
+    await loadAll();
+  } catch(e) { toast('error', 'Failed to update follow-up: ' + e.message); }
+}
+async function claimFollowUp(sourceType, sourceId, assessorId, kind){
+  const { data: { user } } = await sb.auth.getUser();
+  await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'In Progress', assigned_to: user ? user.email : null });
+  toast('success', 'Claimed — marked in progress.');
+}
+async function dismissFollowUp(sourceType, sourceId, assessorId, kind){
+  const { data: { user } } = await sb.auth.getUser();
+  await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'Dismissed', resolved_at: new Date().toISOString(), resolved_by: user ? user.email : null });
+  toast('success', 'Dismissed from the queue.');
+}
+async function reopenFollowUp(sourceType, sourceId, assessorId, kind){
+  await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'Open', resolved_at: null, resolved_by: null });
+  toast('success', 'Reopened.');
+}
+async function noteFollowUp(sourceType, sourceId, assessorId, kind){
+  const existing = followUpFor(sourceType, sourceId);
+  const note = prompt('Note for this follow-up:', existing && existing.notes ? existing.notes : '');
+  if (note === null) return;
+  await upsertFollowUp(sourceType, sourceId, assessorId, kind, { notes: note, status: (existing && existing.status) || 'Open' });
+  toast('success', 'Note saved.');
+}
+function followUpActionsHtml(sourceType, sourceId, assessorId, kind){
+  const fu = followUpFor(sourceType, sourceId);
+  const args = `'${sourceType}',${sourceId},${assessorId},'${kind}'`;
+  const statusChip = fu ? `<span class="chip chip-plain" style="margin-right:6px;">${escapeHtml(fu.status)}${fu.assigned_to ? ' · '+escapeHtml(fu.assigned_to) : ''}</span>` : '';
+  const noteChip = fu && fu.notes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;" title="${escapeHtml(fu.notes)}">&#128221; ${escapeHtml(fu.notes.length>60?fu.notes.slice(0,60)+'…':fu.notes)}</div>` : '';
+  const buttons = fu && fu.status === 'Dismissed'
+    ? `<button class="btn btn-secondary btn-sm" onclick="reopenFollowUp(${args})">Reopen</button>`
+    : `<button class="btn btn-secondary btn-sm" onclick="claimFollowUp(${args})">${fu && fu.status==='In Progress' ? 'Claimed' : 'Claim'}</button>
+       <button class="btn btn-secondary btn-sm" onclick="noteFollowUp(${args})">Note</button>
+       <button class="btn btn-secondary btn-sm" onclick="dismissFollowUp(${args})">Dismiss</button>`;
+  return { statusChip, noteChip, buttons };
+}
 function renderRenewalQueue(){
   const regItems = state.registrations
     .map(r => ({ r, kind: regRiskState(r), days: regDaysUntilExpiry(r) }))
@@ -567,32 +630,48 @@ function renderRenewalQueue(){
     .filter(d => d.status === 'Missing')
     .map(d => ({ d, kind: 'missing_doc', sortKey: [RISK_PRIORITY.missing_doc, 0] }));
 
-  const items = [...regItems, ...docItems].sort((a,b) => (a.sortKey[0]-b.sortKey[0]) || (a.sortKey[1]-b.sortKey[1])).slice(0, 12);
+  let items = [...regItems, ...docItems].sort((a,b) => (a.sortKey[0]-b.sortKey[0]) || (a.sortKey[1]-b.sortKey[1]));
+
+  if (!state.showDismissedFollowUps) {
+    items = items.filter(item => {
+      const sourceType = item.kind === 'missing_doc' ? 'document' : 'registration';
+      const sourceId = item.kind === 'missing_doc' ? item.d.id : item.r.id;
+      const fu = followUpFor(sourceType, sourceId);
+      return !fu || fu.status !== 'Dismissed';
+    });
+  }
+  items = items.slice(0, 12);
 
   const el = document.getElementById('renewal-queue');
   if (!items.length) { el.innerHTML = `<div class="empty-note" style="padding:16px 18px;">Nothing needs attention right now.</div>`; return; }
   el.innerHTML = items.map(item => {
     if (item.kind === 'missing_doc') {
       const a = state.assessors.find(x => x.id === item.d.assessor_id);
-      return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);">
-        <div style="flex:1;">
+      const { statusChip, noteChip, buttons } = followUpActionsHtml('document', item.d.id, item.d.assessor_id, 'missing_doc');
+      return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
           <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(item.d.doc_type)}</span></div>
           <div style="font-size:11px;color:var(--text-muted);">Supporting document not yet on file</div>
+          ${noteChip}
         </div>
-        ${riskBadgeHtml('missing_doc')}
+        ${statusChip}${riskBadgeHtml('missing_doc')}
         <button class="btn btn-secondary btn-sm" onclick="renderDetail(${a?a.id:0})">Open profile</button>
+        ${buttons}
       </div>`;
     }
     const r = item.r;
     const a = state.assessors.find(x => x.id === r.assessor_id);
     const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);">
-      <div style="flex:1;">
+    const { statusChip, noteChip, buttons } = followUpActionsHtml('registration', r.id, r.assessor_id, item.kind);
+    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
         <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(r.seta_name)}</span></div>
         <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(roleLabel)} &middot; ${escapeHtml(r.registration_number||'no reg number')}</div>
+        ${noteChip}
       </div>
-      ${riskBadgeHtml(item.kind, item.days)}
+      ${statusChip}${riskBadgeHtml(item.kind, item.days)}
       <button class="btn btn-secondary btn-sm" onclick="renderDetail(${a?a.id:0})">Open profile</button>
+      ${buttons}
     </div>`;
   }).join('');
 }
