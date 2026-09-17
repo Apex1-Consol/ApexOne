@@ -2118,18 +2118,32 @@ async function doForgotVerify() {
     if (!code) { errEl.textContent = 'Enter the code from your email.'; return; }
     if (!newPassword || newPassword.length < 6) { errEl.textContent = 'New password must be at least 6 characters.'; return; }
 
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
         email: forgotEmail,
         token: code,
         type: 'recovery'
     });
     if (verifyError) { errEl.textContent = verifyError.message; return; }
 
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-    if (updateError) { errEl.textContent = updateError.message; return; }
+    // A successful recovery verifyOtp already signs the user in (Supabase
+    // issues a real session here), independent of whether the password
+    // update below succeeds. Previously the UI stayed on this modal either
+    // way, so a rejected update (e.g. reusing the old password) or a stale
+    // retry left the user stuck looking "logged out" while actually already
+    // authenticated underneath — only a manual page refresh revealed it.
+    // Reflect the real state immediately instead of waiting on the update.
+    if (verifyData?.session?.user) {
+        closeForgot();
+        await onAuthenticated(verifyData.session.user, true);
+    }
 
-    closeForgot();
-    showToast('success', 'Password reset. You can now log in.');
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+        showToast('error', 'Signed in, but password not changed: ' + updateError.message);
+        return;
+    }
+
+    showToast('success', 'Password reset. You are now logged in.');
 }
 
 // ── USER MANAGEMENT ───────────────────────────────────────────────────
