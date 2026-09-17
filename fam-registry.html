@@ -209,7 +209,8 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="expired">Expired</option>
-              <option value="due_soon">Due &le;60 days</option>
+              <option value="due_30">Due &le;30 days</option>
+              <option value="due_60">Due 31&ndash;60 days</option>
               <option value="pending">Pending entry</option>
               <option value="inactive">Inactive</option>
               <option value="unknown">No registrations</option>
@@ -231,7 +232,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
               Show dismissed
             </label>
           </div>
-          <div style="padding:0 18px 10px;font-size:11px;color:var(--text-muted);">Expired, due &le;60 days, pending entry or missing documents &middot; most urgent first</div>
+          <div style="padding:0 18px 10px;font-size:11px;color:var(--text-muted);">Expired, due &le;30 days, due 31&ndash;60 days, pending entry, inactive or missing documents &middot; most urgent first</div>
           <div id="renewal-queue"></div>
         </div>
 
@@ -322,7 +323,13 @@ let state = {
   qualifications: [],
   followUps: [],        // fam_follow_ups — durable claim/dismiss/notes state for action-queue items
   showDismissedFollowUps: false,
-  selectedAssessorId: null,
+  // Deep-link support: index.html's Assessors tab links here as
+  // fam-registry.html?assessor=<id> to open a specific practitioner directly.
+  selectedAssessorId: (() => {
+    const raw = new URLSearchParams(location.search).get('assessor');
+    const n = raw ? Number(raw) : null;
+    return Number.isFinite(n) ? n : null;
+  })(),
   activeTab: 'all',
   tenantId: null,
 };
@@ -427,7 +434,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_soon','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
   return 'active';
 }
 function rolesFor(assessorId){
@@ -451,7 +458,8 @@ function regRiskState(r){
   const days = regDaysUntilExpiry(r);
   if (days === null) return regIsActive(r) ? 'active' : 'inactive';
   if (days < 0) return 'expired';
-  if (days <= 60) return 'due_soon';
+  if (days <= 30) return 'due_30';
+  if (days <= 60) return 'due_60';
   return regIsActive(r) ? 'active' : 'inactive';
 }
 function assessorRiskStates(assessorId){
@@ -477,20 +485,27 @@ function renderStats(){
   const totalRegs = state.registrations.length;
   const active = state.registrations.filter(r => regIsActive(r)).length;
   const expired = state.registrations.filter(r => regRiskState(r) === 'expired').length;
-  const dueSoon = state.registrations.filter(r => regRiskState(r) === 'due_soon').length;
+  const due30 = state.registrations.filter(r => regRiskState(r) === 'due_30').length;
+  const due60 = state.registrations.filter(r => regRiskState(r) === 'due_60').length;
+  const pending = state.registrations.filter(r => regRiskState(r) === 'pending').length;
+  const inactive = state.registrations.filter(r => regRiskState(r) === 'inactive').length;
   const missingDocs = state.documents.filter(d => d.status === 'Missing').length;
   document.getElementById('stat-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Practitioners</div><div class="stat-value">${total}</div></div>
     <div class="stat-card"><div class="stat-label">Registrations</div><div class="stat-value">${totalRegs}</div></div>
     <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:#8FC463;">${active}</div></div>
     <div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value" style="color:#E08585;">${expired}</div></div>
-    <div class="stat-card"><div class="stat-label">Due &le;60 days</div><div class="stat-value" style="color:#E8C468;">${dueSoon}</div></div>
+    <div class="stat-card"><div class="stat-label">Due &le;30 days</div><div class="stat-value" style="color:#E08585;">${due30}</div></div>
+    <div class="stat-card"><div class="stat-label">Due 31&ndash;60 days</div><div class="stat-value" style="color:#E8C468;">${due60}</div></div>
+    <div class="stat-card"><div class="stat-label">Pending entry</div><div class="stat-value" style="color:var(--text-muted);">${pending}</div></div>
+    <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:#E08585;">${inactive}</div></div>
     <div class="stat-card"><div class="stat-label">Missing docs</div><div class="stat-value" style="color:#E08585;">${missingDocs}</div></div>`;
   const banner = document.getElementById('renewal-banner');
+  const dueSoon = due30 + due60;
   const urgent = expired + dueSoon + missingDocs;
   if (urgent > 0) {
     banner.style.display = 'flex';
-    banner.innerHTML = `<span><strong>${expired}</strong> expired &middot; <strong>${dueSoon}</strong> due within 60 days &middot; <strong>${missingDocs}</strong> missing document${missingDocs===1?'':'s'}</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
+    banner.innerHTML = `<span><strong>${expired}</strong> expired &middot; <strong>${due30}</strong> due &le;30 days &middot; <strong>${due60}</strong> due 31&ndash;60 days &middot; <strong>${missingDocs}</strong> missing document${missingDocs===1?'':'s'}</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
   } else banner.style.display = 'none';
 }
 
@@ -551,13 +566,14 @@ function renderTable(){
   document.getElementById('registry-footer').textContent = `${rows.length} practitioner${rows.length===1?'':'s'} shown · scope and documents in profile`;
 }
 
-// ---------- render: action queue (expired / due soon / pending entry / inactive / missing docs) ----------
-// Priority order: expired (most overdue first) > due soon (soonest first) > pending entry > inactive > missing docs.
-const RISK_PRIORITY = { expired: 0, due_soon: 1, pending: 2, inactive: 3, missing_doc: 4 };
+// ---------- render: action queue (expired / due <=30 / due 31-60 / pending entry / inactive / missing docs) ----------
+// Priority order: expired (most overdue first) > due <=30 (soonest first) > due 31-60 (soonest first) > pending entry > inactive > missing docs.
+const RISK_PRIORITY = { expired: 0, due_30: 1, due_60: 2, pending: 3, inactive: 4, missing_doc: 5 };
 function riskBadgeHtml(kind, days){
   const map = {
     expired:    { cls:'color:#E08585;', label: days!=null ? `Expired ${Math.abs(days)}d ago` : 'Expired' },
-    due_soon:   { cls:'color:#E8C468;', label: days!=null ? `Due in ${days}d` : 'Due soon' },
+    due_30:     { cls:'color:#E08585;', label: days!=null ? `Due in ${days}d` : 'Due &le;30 days' },
+    due_60:     { cls:'color:#E8C468;', label: days!=null ? `Due in ${days}d` : 'Due 31&ndash;60 days' },
     pending:    { cls:'color:var(--text-muted);', label: 'Pending entry' },
     inactive:   { cls:'color:#E08585;', label: 'Inactive' },
     missing_doc:{ cls:'color:#E08585;', label: 'Missing document' },
@@ -624,7 +640,7 @@ function renderRenewalQueue(){
   const regItems = state.registrations
     .map(r => ({ r, kind: regRiskState(r), days: regDaysUntilExpiry(r) }))
     .filter(x => x.kind !== 'active')
-    .map(x => ({ ...x, sortKey: [RISK_PRIORITY[x.kind] ?? 9, x.kind==='expired' ? -(x.days ?? 0) : x.kind==='due_soon' ? (x.days ?? 999) : 0] }));
+    .map(x => ({ ...x, sortKey: [RISK_PRIORITY[x.kind] ?? 9, x.kind==='expired' ? -(x.days ?? 0) : (x.kind==='due_30' || x.kind==='due_60') ? (x.days ?? 999) : 0] }));
 
   const docItems = state.documents
     .filter(d => d.status === 'Missing')
