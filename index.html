@@ -444,6 +444,60 @@
         .nav-group-label.role-hidden{display:none!important;}
         .nav-section-divider.role-hidden{display:none!important;}
     </style>
+<style>
+/* ---- FAM Registry (native tab) — scoped under #view-fam so it cannot
+   leak into or collide with the rest of the app's stylesheet. Ported from
+   the standalone fam-registry.html; login/turnstile/scope-import removed,
+   modals rewritten to reuse the app's own .modal-overlay/.modal-card/
+   .filter-group/.filter-input classes instead of parallel ones. ---- */
+#view-fam .two-col{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start;}
+@media (max-width:1000px){#view-fam .two-col{grid-template-columns:1fr;}}
+#view-fam .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:18px;}
+#view-fam .stat-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:16px 18px;}
+#view-fam .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);}
+#view-fam .stat-value{font-weight:800;font-size:22px;font-family:var(--font-serif);margin-top:4px;}
+#view-fam .fam-banner{background:rgba(212,165,55,0.12);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px 20px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:12.5px;}
+#view-fam .tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--border-subtle);}
+#view-fam .tab{padding:10px 12px;font-size:12px;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;}
+#view-fam .tab.active{color:var(--text-primary);font-weight:700;border-bottom-color:var(--accent-gold);}
+#view-fam .filter-row{display:flex;gap:8px;padding:14px 18px;flex-wrap:wrap;}
+#view-fam .filter-row input,#view-fam .filter-row select{padding:8px 10px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;}
+#view-fam .filter-row input{flex:1;min-width:180px;}
+#view-fam tr.fam-reg-row{cursor:pointer;}
+#view-fam tr.fam-reg-row:hover td{background:var(--bg-card-hover);}
+#view-fam tr.fam-reg-row.selected td{background:rgba(212,165,55,0.08);}
+#view-fam .avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;flex-shrink:0;background:var(--accent-gold);}
+#view-fam .name-cell{display:flex;align-items:center;gap:10px;}
+#view-fam .chip{font-size:10px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;margin:1px 2px 1px 0;}
+#view-fam .chip-assessor{background:rgba(55,138,221,0.18);color:#7DB6E8;}
+#view-fam .chip-moderator{background:rgba(212,165,55,0.2);color:#E8C468;}
+#view-fam .chip-facilitator{background:rgba(59,109,17,0.22);color:#8FC463;}
+#view-fam .chip-plain{background:rgba(255,255,255,0.06);color:var(--text-secondary);border:1px solid var(--border-subtle);}
+#view-fam .status-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;}
+#view-fam .status-dot::before{content:'';width:6px;height:6px;border-radius:50%;}
+#view-fam .status-active{color:#8FC463;} #view-fam .status-active::before{background:#8FC463;}
+#view-fam .status-expired{color:#E08585;} #view-fam .status-expired::before{background:#E08585;}
+#view-fam .status-mixed{color:#E8C468;} #view-fam .status-mixed::before{background:#E8C468;}
+#view-fam .status-unknown{color:var(--text-muted);} #view-fam .status-unknown::before{background:var(--text-muted);}
+#view-fam .detail-panel{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:0;position:sticky;top:18px;max-height:calc(100vh - 36px);overflow-y:auto;}
+#view-fam .detail-header{padding:18px 20px;border-bottom:1px solid var(--border-subtle);display:flex;gap:12px;align-items:center;}
+#view-fam .detail-body{padding:18px 20px;display:flex;flex-direction:column;gap:16px;}
+#view-fam .detail-section-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);border-bottom:1px solid var(--border-subtle);padding-bottom:6px;margin-bottom:2px;}
+#view-fam .kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;}
+#view-fam .kv-grid .k{color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;}
+#view-fam .reg-group{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0;margin-bottom:10px;overflow:hidden;}
+#view-fam .reg-group-head{padding:10px 12px;background:var(--bg-secondary);font-weight:700;font-size:12px;display:flex;justify-content:space-between;}
+#view-fam .reg-card{padding:12px;border-top:1px solid var(--border-subtle);}
+#view-fam .reg-card:first-of-type{border-top:none;}
+#view-fam .reg-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;}
+#view-fam .doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#view-fam .doc-card{border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--bg-secondary);}
+#view-fam .doc-card .name{font-weight:700;font-size:12px;}
+#view-fam .doc-card .meta{font-size:10.5px;color:var(--text-muted);}
+#view-fam .doc-card.missing .meta{color:var(--accent-rose);}
+#view-fam .fam-small-link{font-size:11px;color:var(--accent-cyan);cursor:pointer;background:none;border:none;padding:0;}
+#view-fam .empty-note{font-size:11.5px;color:var(--text-muted);font-style:italic;padding:6px 0;}
+</style>
 </head>
 <body>
 
@@ -720,7 +774,7 @@
                 <li class="nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')"><span class="nav-num">11</span><span class="nav-icon">&#9633;</span>Reports &amp; Compliance</li>
                 <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')"><span class="nav-icon" style="margin-left:28px">&#128196;</span>Report Generator <span style="opacity:.55;font-size:.85em;">&#8599;</span></li>
                 <li class="nav-item" data-view="assessors" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('assessors')"><span class="nav-num">12</span><span class="nav-icon">&#127891;</span>Assessors &amp; Moderators</li>
-                <li class="nav-item" data-roles="admin,qa_specialist,etqa,demo" onclick="openExternalApp('fam-registry.html')"><span class="nav-icon" style="margin-left:28px">&#128218;</span>FAM Registry <span style="opacity:.55;font-size:.85em;">&#8599;</span></li>
+                <li class="nav-item" data-view="fam" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('fam')"><span class="nav-icon" style="margin-left:28px">&#128218;</span>FAM Registry</li>
                 <li class="nav-section-divider" data-roles="admin" style="border-top-color:rgba(244,63,94,0.25);">System</li>
                 <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')"><span class="nav-num">13</span><span class="nav-icon">&#128279;</span>QCTO / SETA Links <span style="opacity:.55;font-size:.85em;">&#8599;</span></li>
                 <li class="nav-item" data-view="audit" data-roles="admin,head_of_ops,demo" onclick="switchTab('audit')"><span class="nav-num">14</span><span class="nav-icon">&#128203;</span>Audit Events</li>
@@ -808,7 +862,7 @@
             <div class="mobile-nav-item" data-view="monitoring" data-roles="admin,qa_specialist,project_manager,demo" onclick="switchTab('monitoring')">Monitoring</div>
             <div class="mobile-nav-item" data-view="poe" data-roles="admin,etqa,qa_specialist,project_manager,demo" onclick="switchTab('poe')">PoE Checklist</div>
             <div class="mobile-nav-item" data-view="assessors" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('assessors')">Assessors</div>
-            <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,demo" onclick="openExternalApp('fam-registry.html')">FAM Registry &#8599;</div>
+            <div class="mobile-nav-item" data-view="fam" data-roles="admin,qa_specialist,etqa,demo" onclick="switchTab('fam')">FAM Registry</div>
             <div class="mobile-nav-item" data-view="recommendations" data-roles="admin,qa_specialist,project_manager,demo" onclick="switchTab('recommendations')">Recommendations</div>
             <div class="mobile-nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')">Reports</div>
             <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')">Report Generator &#8599;</div>
@@ -1228,7 +1282,7 @@
                         <h2>Assessors &amp; Moderators</h2>
                         <div class="container-actions">
                             <button class="btn btn-secondary btn-sm" onclick="loadAssessors()">&#8635; Reload</button>
-                            <a class="btn btn-secondary btn-sm" href="fam-registry.html" target="_blank">FAM Registry &#8594;</a>
+                            <button class="btn btn-secondary btn-sm" onclick="switchTab('fam')">FAM Registry &#8594;</button>
                             <button class="btn btn-gold btn-sm" data-roles="admin,qa_specialist,etqa" onclick="openAddAssessorModal()">+ Add Person</button>
                         </div>
                     </div>
@@ -1533,12 +1587,126 @@
                     </div>
                 </div>
             </section>
+            <section id="view-fam" class="view-panel" data-roles="admin,qa_specialist,etqa,demo">
+                <div class="fam-banner" id="fam-renewal-banner" style="display:none;"></div>
+
+                <div class="stat-row" id="fam-stat-row"></div>
+
+                <div class="two-col">
+                    <div class="content-container" style="margin-bottom:0;">
+                        <div class="container-header">
+                            <h2>Practitioner registry</h2>
+                            <div class="container-actions">
+                                <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
+                                <button class="btn btn-secondary btn-sm" onclick="FAM.loadAll()">&#8635; Refresh</button>
+                                <button class="btn btn-gold btn-sm" onclick="FAM.openAddPractitioner()">+ Add practitioner</button>
+                            </div>
+                        </div>
+                        <div class="tabs" id="fam-reg-tabs"></div>
+                        <div class="filter-row">
+                            <input id="fam-search-box" placeholder="Search name, ID or registration number&hellip;" oninput="FAM.renderTable()">
+                            <select id="fam-role-filter" onchange="FAM.renderTable()"><option value="">All roles</option><option>Assessor</option><option>Moderator</option><option>Facilitator</option></select>
+                            <select id="fam-status-filter" onchange="FAM.renderTable()">
+                                <option value="">All statuses</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="due_30">Due &le;30 days</option>
+                                <option value="due_60">Due 31&ndash;60 days</option>
+                                <option value="pending">Pending entry</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="unknown">No registrations</option>
+                            </select>
+                            <select id="fam-seta-filter" onchange="FAM.renderTable()"><option value="">All SETAs</option></select>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th>Practitioner</th><th>Role(s)</th><th>SETA coverage</th><th>Status</th><th></th></tr></thead>
+                                <tbody id="fam-registry-tbody"><tr><td colspan="5" class="empty-note">Loading&hellip;</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div style="padding:10px 18px;font-size:11px;color:var(--text-muted);" id="fam-registry-footer"></div>
+
+                        <div class="container-header" style="margin-top:4px;">
+                            <h2>Action queue</h2>
+                            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                <input type="checkbox" id="fam-queue-show-dismissed" onchange="FAM.setShowDismissed(this.checked)">
+                                Show dismissed
+                            </label>
+                        </div>
+                        <div style="padding:0 18px 10px;font-size:11px;color:var(--text-muted);">Expired, due &le;30 days, due 31&ndash;60 days, pending entry, inactive or missing documents &middot; most urgent first</div>
+                        <div id="fam-renewal-queue"></div>
+                    </div>
+
+                    <div class="detail-panel" id="fam-detail-panel">
+                        <div class="empty-note" style="padding:24px;">Select a practitioner to see their full profile.</div>
+                    </div>
+                </div>
+            </section>
 
         </div>
     </main>
 </div>
 
 <div class="toast-container" id="toast-container"></div>
+<!-- FAM Registry modals (native tab — ported from fam-registry.html).
+     Reuse the app's own modal-overlay/hidden/modal-card/filter-group/filter-input
+     conventions rather than the standalone page's parallel .modal/.field CSS. -->
+<div class="modal-overlay hidden" id="fam-modal-practitioner" onclick="if(event.target===this)closeModal('fam-modal-practitioner')">
+    <div class="modal-card">
+        <h2 style="font-size:16px;margin-bottom:20px;">Add practitioner</h2>
+        <div class="modal-error" id="fam-pr-error" style="color:var(--accent-rose);font-size:11.5px;min-height:14px;margin-bottom:6px;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Full name *</span><input id="fam-pr-name" class="filter-input" type="text" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">ID number</span><input id="fam-pr-idnum" class="filter-input" type="text" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Email</span><input id="fam-pr-email" class="filter-input" type="text" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Phone</span><input id="fam-pr-phone" class="filter-input" type="text" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:20px;"><span class="filter-label">Physical address</span><input id="fam-pr-address" class="filter-input" type="text" style="width:100%;"></div>
+        <div style="display:flex;gap:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-modal-practitioner')">Cancel</button><button class="btn btn-gold" style="flex:1;" onclick="FAM.savePractitioner()">Save</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="fam-modal-registration" onclick="if(event.target===this)closeModal('fam-modal-registration')">
+    <div class="modal-card">
+        <h2 style="font-size:16px;margin-bottom:20px;">Add SETA registration</h2>
+        <div class="modal-error" id="fam-rg-error" style="color:var(--accent-rose);font-size:11.5px;min-height:14px;margin-bottom:6px;"></div>
+        <input type="hidden" id="fam-rg-assessor-id">
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Role(s) *</span>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:6px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" value="Facilitator" class="fam-rg-role-cb" style="width:auto;"> Facilitator</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" value="Assessor" class="fam-rg-role-cb" style="width:auto;"> Assessor</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;"><input type="checkbox" value="Moderator" class="fam-rg-role-cb" style="width:auto;"> Moderator</label>
+            </div>
+        </div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Status *</span>
+            <select id="fam-rg-status" class="filter-select" style="width:100%;"><option>Active</option><option>Inactive</option></select>
+        </div>
+        <div class="filter-group" style="margin-bottom:20px;"><span class="filter-label">Scope &mdash; qualifications covered</span>
+            <select id="fam-rg-scope" class="filter-select" multiple size="8" style="width:100%;"></select>
+            <div style="font-size:10.5px;color:var(--text-muted);margin-top:4px;">Cmd/Ctrl-click to select more than one. New qualifications can be added from the Programmes tab.</div>
+        </div>
+        <div style="display:flex;gap:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-modal-registration')">Cancel</button><button class="btn btn-gold" style="flex:1;" onclick="FAM.saveRegistration()">Save</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="fam-modal-document" onclick="if(event.target===this)closeModal('fam-modal-document')">
+    <div class="modal-card">
+        <h2 style="font-size:16px;margin-bottom:20px;" id="fam-dc-title">Add / update document</h2>
+        <div class="modal-error" id="fam-dc-error" style="color:var(--accent-rose);font-size:11.5px;min-height:14px;margin-bottom:6px;"></div>
+        <input type="hidden" id="fam-dc-assessor-id">
+        <input type="hidden" id="fam-dc-replace-of">
+        <div id="fam-dc-replace-note" style="display:none;font-size:11px;color:var(--text-muted);margin:-4px 0 10px;">Replacing keeps the current file as version history — it is never deleted, just marked superseded.</div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Document type *</span>
+            <select id="fam-dc-type" class="filter-select" style="width:100%;"><option>CV</option><option>Highest Qualification</option><option>SLA</option><option>ID</option><option>QUAL</option><option>AFFIDAVIT</option></select>
+        </div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Status *</span>
+            <select id="fam-dc-status" class="filter-select" style="width:100%;"><option>Missing</option><option>Current</option></select>
+        </div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Date loaded</span><input id="fam-dc-date" class="filter-input" type="date" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:20px;"><span class="filter-label" id="fam-dc-file-label">Upload file</span><input id="fam-dc-file" class="filter-input" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png" style="width:100%;">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">PDF, Word, or image (JPG/PNG) — up to 10 MB.</div>
+        </div>
+        <div style="display:flex;gap:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-modal-document')">Cancel</button><button class="btn btn-gold" style="flex:1;" onclick="FAM.saveDocument()">Save</button></div>
+    </div>
+</div>
 
 <!-- ADD MODALS (simple inline forms) -->
 <div id="add-programme-modal" class="modal-overlay hidden">
@@ -1968,6 +2136,13 @@ async function onAuthenticated(user, isFreshLogin = false) {
     const requestedView = (location.hash.match(/view=([a-z]+)/i) || [])[1];
     if (requestedView && document.getElementById('view-' + requestedView)) {
         switchTab(requestedView);
+        // Further deep-link into a specific practitioner's profile, e.g.
+        // index.html#view=fam&assessor=123 (used by famStatusBadgeHtml above
+        // and available for any future external link into the FAM tab).
+        if (requestedView === 'fam') {
+            const requestedAssessorId = (location.hash.match(/assessor=(\d+)/i) || [])[1];
+            if (requestedAssessorId) FAM.openAssessor(Number(requestedAssessorId));
+        }
     }
 }
 
@@ -3051,7 +3226,8 @@ function switchTab(viewName) {
         attendance:{title:'Attendance Register',subtitle:'Session-by-session learner attendance per programme'},
         poe:{title:'PoE & Document Checklist',subtitle:'Track required documents per learner — ID, logbook, PoE, consent and more'},
         hoo:{title:'Consolidated Overview',subtitle:'Live pull from all team members — Management view'},
-        audit:{title:'Audit Log',subtitle:'Full history of all data changes — who did what and when'}
+        audit:{title:'Audit Log',subtitle:'Full history of all data changes — who did what and when'},
+        fam:{title:'Facilitators, Assessors & Moderators',subtitle:'Registry — scope and documents tracked per person, per SETA'}
     };
     const t = titles[viewName] || {title:'Dashboard',subtitle:''};
     document.getElementById('page-title-text').textContent = t.title;
@@ -3077,6 +3253,7 @@ function switchTab(viewName) {
     if (viewName === 'hoo') { loadHooDashboard(); startHooAutoRefresh(); }
     else { stopHooAutoRefresh(); }
     if (viewName === 'audit') { loadAuditLog(); }
+    if (viewName === 'fam') { FAM.init(); }
 }
 
 function toggleTheme() {
@@ -5254,7 +5431,9 @@ function famStatusBadgeHtml(status, assessorId) {
         return '<span style="color:var(--text-muted);font-size:11px;font-style:italic;">No FAM data</span>';
     }
     const s = FAM_STATUS_STYLE[status] || { color: 'var(--text-muted)', label: status };
-    return `<a href="fam-registry.html?assessor=${encodeURIComponent(assessorId)}" target="_blank" rel="noopener noreferrer"
+    // In-page deep link: switch to the native FAM tab, then open this
+    // practitioner's profile directly (see FAM.openAssessor / FAM.init below).
+    return `<a href="#" onclick="event.preventDefault();switchTab('fam');FAM.openAssessor(${JSON.stringify(assessorId)});"
         style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:${s.color};text-decoration:none;"
         title="Open ${escapeHtml(s.label)} record in FAM Registry">
         <span style="width:6px;height:6px;border-radius:50%;background:${s.color};display:inline-block;"></span>${escapeHtml(s.label)}
@@ -9334,6 +9513,694 @@ document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){se
 <div id="print-viewport"></div>
 <div id="pdf-render"></div>
 
+<script>
+// ============================================================
+// FAM Registry — native tab (ported from the standalone
+// fam-registry.html). Everything lives inside this IIFE so it
+// cannot collide with the main app's own globals of the same
+// name (state, toast, escapeHtml, openModal, closeModal all
+// exist at top level already — this namespace reuses the app's
+// versions of those rather than redefining them).
+//
+// Deliberately NOT ported: the "Scope Import" bulk qualification
+// catalogue / approval feature present in the current standalone
+// fam-registry.html. It was added independently outside the
+// approved fold-in design and is not part of this change. It
+// remains available on the standalone page. See PR description
+// for details — porting it is a candidate follow-up.
+//
+// No second Supabase client, no login/Turnstile: index.html
+// already has an authenticated session by the time any tab can
+// render, so all of that is stripped out. `sb` below is just an
+// alias for the app's one real client (the bare global `supabase`
+// created near the top of this file).
+// ============================================================
+const FAM = (function () {
+  const sb = supabase;
+
+  const fs = {
+    assessors: [],
+    registrations: [],
+    documents: [],
+    qualifications: [],
+    followUps: [],
+    showDismissedFollowUps: false,
+    selectedAssessorId: null,
+    tenantId: null,
+    loaded: false,
+    loading: false,
+  };
+
+  // Mirrors public.auth_is_admin() in Postgres.
+  function isAdminRole(role) {
+    if (Array.isArray(role)) return role.includes('admin');
+    return role === 'admin';
+  }
+  // The main app already tracks the signed-in user's role on the outer
+  // (global) `state` object as state.currentRole — reuse it rather than
+  // re-deriving admin-ness from the session ourselves.
+  function isAdmin() {
+    return (typeof state !== 'undefined' && state.currentRole === 'admin') || isAdminRole(state && state.currentRoles);
+  }
+
+  async function authHeaders() {
+    const { data: { session } } = await sb.auth.getSession();
+    return {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    };
+  }
+  async function api(path, opts = {}) {
+    const headers = await authHeaders();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}) } });
+    if (!res.ok) { const t = await res.text(); throw new Error(t || res.statusText); }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  // ---------- data load ----------
+  async function loadAll() {
+    fs.loading = true;
+    try {
+      if (!fs.tenantId) fs.tenantId = await getTenantId();
+      const [assessors, regs, scope, docs, quals, followUps] = await Promise.all([
+        api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
+        api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
+        api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
+        api('fam_documents?select=*'),
+        api('qualifications?select=id,name,qualification_code,saqa_id,seta&order=name.asc'),
+        api('fam_follow_ups?select=*&status=neq.Done'),
+      ]);
+      fs.assessors = assessors || [];
+      fs.documents = docs || [];
+      fs.qualifications = quals || [];
+      fs.followUps = followUps || [];
+      const scopeByReg = {};
+      (scope || []).forEach(s => { (scopeByReg[s.registration_id] ||= []).push(s); });
+      fs.registrations = (regs || []).map(r => ({ ...r, scope: scopeByReg[r.id] || [] }));
+
+      const sel = document.getElementById('fam-rg-scope');
+      if (sel) sel.innerHTML = fs.qualifications.map(q => `<option value="${q.id}">${q.seta && q.seta !== 'N/A' ? '[' + escapeHtml(q.seta) + '] ' : ''}${escapeHtml(q.name)}</option>`).join('');
+
+      renderStats();
+      renderFilterOptions();
+      renderTabs();
+      renderTable();
+      renderRenewalQueue();
+      if (!fs.selectedAssessorId || !fs.assessors.some(a => String(a.id) === String(fs.selectedAssessorId))) fs.selectedAssessorId = fs.assessors[0]?.id || null;
+      if (fs.selectedAssessorId) renderDetail(fs.selectedAssessorId);
+    } catch (e) {
+      console.error(e);
+      showToast('error', 'Failed to load FAM Registry data: ' + e.message);
+    } finally {
+      fs.loading = false;
+    }
+  }
+
+  // Called once, the first time the FAM tab is switched to (see switchTab()
+  // in the main script). Lazy — FAM data is never fetched at app boot.
+  async function init() {
+    if (fs.loaded || fs.loading) return;
+    fs.loaded = true;
+    await loadAll();
+  }
+
+  // ---------- derived helpers ----------
+  function regsFor(assessorId) { return fs.registrations.filter(r => String(r.assessor_id) === String(assessorId)); }
+  function regIsActive(r) { return (r.status || 'Active') === 'Active'; }
+  function overallStatus(assessorId) {
+    const regs = regsFor(assessorId);
+    if (!regs.length) return 'unknown';
+    const states = regs.map(regRiskState);
+    if (states.every(s => s === 'active')) return 'active';
+    if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
+    if (states.some(s => ['due_30', 'due_60', 'pending', 'inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
+    return 'active';
+  }
+  function rolesFor(assessorId) {
+    const set = new Set();
+    regsFor(assessorId).forEach(r => {
+      const roles = (r.roles && r.roles.length) ? r.roles : (r.role ? [r.role] : []);
+      roles.forEach(x => set.add(x));
+    });
+    return [...set];
+  }
+  function setasFor(assessorId) { return [...new Set(regsFor(assessorId).map(r => r.seta_name).filter(s => s && s !== 'N/A' && s !== 'Pending Entry'))]; }
+
+  function regDaysUntilExpiry(r) {
+    if (!r.registration_expiry_date) return null;
+    const ms = new Date(r.registration_expiry_date + 'T00:00:00') - new Date(new Date().toDateString());
+    return Math.round(ms / 86400000);
+  }
+  function regRiskState(r) {
+    if (r.status === 'Pending Entry') return 'pending';
+    const days = regDaysUntilExpiry(r);
+    if (days === null) return regIsActive(r) ? 'active' : 'inactive';
+    if (days < 0) return 'expired';
+    if (days <= 30) return 'due_30';
+    if (days <= 60) return 'due_60';
+    return regIsActive(r) ? 'active' : 'inactive';
+  }
+  function assessorRiskStates(assessorId) {
+    const regs = regsFor(assessorId);
+    if (!regs.length) return ['unknown'];
+    return [...new Set(regs.map(regRiskState))];
+  }
+
+  const RISK_PRIORITY = { expired: 0, due_30: 1, due_60: 2, pending: 3, inactive: 4, missing_doc: 5 };
+
+  function statusPillHtml(status) {
+    const map = { active: ['status-active', 'Active'], inactive: ['status-expired', 'Inactive'], expired: ['status-expired', 'Expired'], mixed: ['status-mixed', 'Mixed'], needs_review: ['status-mixed', 'Needs review'], unknown: ['status-unknown', 'No registrations'] };
+    const [cls, label] = map[status] || map.unknown;
+    return `<span class="status-dot ${cls}">${label}</span>`;
+  }
+  function roleChipHtml(role) {
+    const cls = role === 'Assessor' ? 'chip-assessor' : role === 'Moderator' ? 'chip-moderator' : 'chip-facilitator';
+    return `<span class="chip ${cls}">${escapeHtml(role)}</span>`;
+  }
+  function riskBadgeHtml(kind, days) {
+    const map = {
+      expired: { cls: 'color:#E08585;', label: days != null ? `Expired ${Math.abs(days)}d ago` : 'Expired' },
+      due_30: { cls: 'color:#E08585;', label: days != null ? `Due in ${days}d` : 'Due &le;30 days' },
+      due_60: { cls: 'color:#E8C468;', label: days != null ? `Due in ${days}d` : 'Due 31&ndash;60 days' },
+      pending: { cls: 'color:var(--text-muted);', label: 'Pending entry' },
+      inactive: { cls: 'color:#E08585;', label: 'Inactive' },
+      missing_doc: { cls: 'color:#E08585;', label: 'Missing document' },
+    };
+    const m = map[kind] || map.inactive;
+    return `<div style="font-size:11.5px;font-weight:700;${m.cls}white-space:nowrap;">${m.label}</div>`;
+  }
+
+  // ---------- render: stats + banner ----------
+  function renderStats() {
+    const total = fs.assessors.length;
+    const totalRegs = fs.registrations.length;
+    const active = fs.registrations.filter(r => regIsActive(r)).length;
+    const expired = fs.registrations.filter(r => regRiskState(r) === 'expired').length;
+    const due30 = fs.registrations.filter(r => regRiskState(r) === 'due_30').length;
+    const due60 = fs.registrations.filter(r => regRiskState(r) === 'due_60').length;
+    const pending = fs.registrations.filter(r => regRiskState(r) === 'pending').length;
+    const inactive = fs.registrations.filter(r => regRiskState(r) === 'inactive').length;
+    const missingDocs = fs.documents.filter(d => d.status === 'Missing').length;
+    document.getElementById('fam-stat-row').innerHTML = `
+      <div class="stat-card"><div class="stat-label">Practitioners</div><div class="stat-value">${total}</div></div>
+      <div class="stat-card"><div class="stat-label">Registrations</div><div class="stat-value">${totalRegs}</div></div>
+      <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:#8FC463;">${active}</div></div>
+      <div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value" style="color:#E08585;">${expired}</div></div>
+      <div class="stat-card"><div class="stat-label">Due &le;30 days</div><div class="stat-value" style="color:#E08585;">${due30}</div></div>
+      <div class="stat-card"><div class="stat-label">Due 31&ndash;60 days</div><div class="stat-value" style="color:#E8C468;">${due60}</div></div>
+      <div class="stat-card"><div class="stat-label">Pending entry</div><div class="stat-value" style="color:var(--text-muted);">${pending}</div></div>
+      <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:#E08585;">${inactive}</div></div>
+      <div class="stat-card"><div class="stat-label">Missing docs</div><div class="stat-value" style="color:#E08585;">${missingDocs}</div></div>`;
+    const banner = document.getElementById('fam-renewal-banner');
+    const dueSoon = due30 + due60;
+    const urgent = expired + dueSoon + missingDocs;
+    if (urgent > 0) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span><strong>${expired}</strong> expired &middot; <strong>${due30}</strong> due &le;30 days &middot; <strong>${due60}</strong> due 31&ndash;60 days &middot; <strong>${missingDocs}</strong> missing document${missingDocs === 1 ? '' : 's'}</span><span style="color:var(--text-muted);">Data reflects live ApexOne database</span>`;
+    } else banner.style.display = 'none';
+  }
+
+  function renderFilterOptions() {
+    const sel = document.getElementById('fam-seta-filter');
+    const current = sel.value;
+    const setas = [...new Set(fs.registrations.map(r => r.seta_name).filter(s => s && s !== 'N/A' && s !== 'Pending Entry'))].sort();
+    sel.innerHTML = `<option value="">All SETAs</option>` + setas.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    if (setas.includes(current)) sel.value = current;
+  }
+
+  function renderTabs() {
+    const needsAttention = fs.assessors.filter(a => ['expired', 'mixed', 'needs_review'].includes(overallStatus(a.id))).length;
+    const activeOnly = fs.assessors.filter(a => overallStatus(a.id) === 'active').length;
+    const tabs = [
+      ['all', `All practitioners (${fs.assessors.length})`],
+      ['attention', `Needs attention (${needsAttention})`],
+      ['active', `Active only (${activeOnly})`],
+    ];
+    document.getElementById('fam-reg-tabs').innerHTML = tabs.map(([key, label]) =>
+      `<div class="tab ${fs.activeTab === key ? 'active' : ''}" onclick="FAM.setTab('${key}')">${label}</div>`).join('');
+  }
+  function setTab(key) { fs.activeTab = key; renderTabs(); renderTable(); }
+  function setShowDismissed(checked) { fs.showDismissedFollowUps = checked; renderRenewalQueue(); }
+
+  // ---------- render: table ----------
+  function renderTable() {
+    const search = (document.getElementById('fam-search-box').value || '').toLowerCase();
+    const roleFilter = document.getElementById('fam-role-filter').value;
+    const statusFilter = document.getElementById('fam-status-filter').value;
+    const setaFilter = document.getElementById('fam-seta-filter').value;
+    let rows = fs.assessors.filter(a => {
+      const status = overallStatus(a.id);
+      if (fs.activeTab === 'attention' && !['expired', 'mixed', 'needs_review'].includes(status)) return false;
+      if (fs.activeTab === 'active' && status !== 'active') return false;
+      if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
+      if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
+      if (setaFilter && !setasFor(a.id).includes(setaFilter)) return false;
+      if (search) {
+        const hay = [a.full_name, a.id_number, ...regsFor(a.id).map(r => r.registration_number)].join(' ').toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+    const tbody = document.getElementById('fam-registry-tbody');
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-note">No practitioners match this view.</td></tr>`; document.getElementById('fam-registry-footer').textContent = ''; return; }
+    tbody.innerHTML = rows.map(a => {
+      const initials = (a.full_name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+      const roles = rolesFor(a.id);
+      const setas = setasFor(a.id);
+      return `<tr class="fam-reg-row ${fs.selectedAssessorId == a.id ? 'selected' : ''}" onclick="FAM.renderDetail(${a.id})">
+        <td><div class="name-cell"><div class="avatar">${initials}</div><div><strong>${escapeHtml(a.full_name)}</strong><br><span style="color:var(--text-muted);font-size:10.5px;">${a.id_number ? escapeHtml(a.id_number) : 'ID not captured'}</span></div></div></td>
+        <td>${roles.length ? roles.map(roleChipHtml).join('') : '<span class="empty-note">No role yet</span>'}</td>
+        <td>${setas.length ? setas.map(s => `<span class="chip chip-plain">${escapeHtml(s)}</span>`).join('') : '<span class="empty-note">Not registered</span>'}</td>
+        <td>${statusPillHtml(overallStatus(a.id))}</td>
+        <td><a href="#" onclick="event.preventDefault();event.stopPropagation();FAM.renderDetail(${a.id})">&rarr;</a></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('fam-registry-footer').textContent = `${rows.length} practitioner${rows.length === 1 ? '' : 's'} shown · scope and documents in profile`;
+  }
+
+  // ---------- render: action queue ----------
+  function followUpFor(sourceType, sourceId) {
+    return fs.followUps.find(f => f.source_type === sourceType && String(f.source_id) === String(sourceId));
+  }
+  async function upsertFollowUp(sourceType, sourceId, assessorId, kind, fields) {
+    if (!fs.tenantId) { showToast('error', 'No tenant on your account.'); return; }
+    const body = { tenant_id: fs.tenantId, assessor_id: assessorId, source_type: sourceType, source_id: sourceId, kind, ...fields };
+    try {
+      await api(`fam_follow_ups?on_conflict=tenant_id,assessor_id,source_type,source_id`, {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify(body),
+      });
+      await loadAll();
+    } catch (e) { showToast('error', 'Failed to update follow-up: ' + e.message); }
+  }
+  async function claimFollowUp(sourceType, sourceId, assessorId, kind) {
+    const { data: { user } } = await sb.auth.getUser();
+    await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'In Progress', assigned_to: user ? user.email : null });
+    showToast('success', 'Claimed — marked in progress.');
+  }
+  async function dismissFollowUp(sourceType, sourceId, assessorId, kind) {
+    const { data: { user } } = await sb.auth.getUser();
+    await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'Dismissed', resolved_at: new Date().toISOString(), resolved_by: user ? user.email : null });
+    showToast('success', 'Dismissed from the queue.');
+  }
+  async function reopenFollowUp(sourceType, sourceId, assessorId, kind) {
+    await upsertFollowUp(sourceType, sourceId, assessorId, kind, { status: 'Open', resolved_at: null, resolved_by: null });
+    showToast('success', 'Reopened.');
+  }
+  async function noteFollowUp(sourceType, sourceId, assessorId, kind) {
+    const existing = followUpFor(sourceType, sourceId);
+    const note = prompt('Note for this follow-up:', existing && existing.notes ? existing.notes : '');
+    if (note === null) return;
+    await upsertFollowUp(sourceType, sourceId, assessorId, kind, { notes: note, status: (existing && existing.status) || 'Open' });
+    showToast('success', 'Note saved.');
+  }
+  function followUpActionsHtml(sourceType, sourceId, assessorId, kind) {
+    const fu = followUpFor(sourceType, sourceId);
+    const args = `'${sourceType}',${sourceId},${assessorId},'${kind}'`;
+    const statusChip = fu ? `<span class="chip chip-plain" style="margin-right:6px;">${escapeHtml(fu.status)}${fu.assigned_to ? ' · ' + escapeHtml(fu.assigned_to) : ''}</span>` : '';
+    const noteChip = fu && fu.notes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;" title="${escapeHtml(fu.notes)}">&#128221; ${escapeHtml(fu.notes.length > 60 ? fu.notes.slice(0, 60) + '…' : fu.notes)}</div>` : '';
+    const buttons = fu && fu.status === 'Dismissed'
+      ? `<button class="btn btn-secondary btn-sm" onclick="FAM.reopenFollowUp(${args})">Reopen</button>`
+      : `<button class="btn btn-secondary btn-sm" onclick="FAM.claimFollowUp(${args})">${fu && fu.status === 'In Progress' ? 'Claimed' : 'Claim'}</button>
+         <button class="btn btn-secondary btn-sm" onclick="FAM.noteFollowUp(${args})">Note</button>
+         <button class="btn btn-secondary btn-sm" onclick="FAM.dismissFollowUp(${args})">Dismiss</button>`;
+    return { statusChip, noteChip, buttons };
+  }
+  function renderRenewalQueue() {
+    const regItems = fs.registrations
+      .map(r => ({ r, kind: regRiskState(r), days: regDaysUntilExpiry(r) }))
+      .filter(x => x.kind !== 'active')
+      .map(x => ({ ...x, sortKey: [RISK_PRIORITY[x.kind] ?? 9, x.kind === 'expired' ? -(x.days ?? 0) : (x.kind === 'due_30' || x.kind === 'due_60') ? (x.days ?? 999) : 0] }));
+    const docItems = fs.documents
+      .filter(d => d.status === 'Missing')
+      .map(d => ({ d, kind: 'missing_doc', sortKey: [RISK_PRIORITY.missing_doc, 0] }));
+    let items = [...regItems, ...docItems].sort((a, b) => (a.sortKey[0] - b.sortKey[0]) || (a.sortKey[1] - b.sortKey[1]));
+    if (!fs.showDismissedFollowUps) {
+      items = items.filter(item => {
+        const sourceType = item.kind === 'missing_doc' ? 'document' : 'registration';
+        const sourceId = item.kind === 'missing_doc' ? item.d.id : item.r.id;
+        const fu = followUpFor(sourceType, sourceId);
+        return !fu || fu.status !== 'Dismissed';
+      });
+    }
+    items = items.slice(0, 12);
+    const el = document.getElementById('fam-renewal-queue');
+    if (!items.length) { el.innerHTML = `<div class="empty-note" style="padding:16px 18px;">Nothing needs attention right now.</div>`; return; }
+    el.innerHTML = items.map(item => {
+      if (item.kind === 'missing_doc') {
+        const a = fs.assessors.find(x => x.id === item.d.assessor_id);
+        const { statusChip, noteChip, buttons } = followUpActionsHtml('document', item.d.id, item.d.assessor_id, 'missing_doc');
+        return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a ? a.full_name : 'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(item.d.doc_type)}</span></div>
+            <div style="font-size:11px;color:var(--text-muted);">Supporting document not yet on file</div>
+            ${noteChip}
+          </div>
+          ${statusChip}${riskBadgeHtml('missing_doc')}
+          <button class="btn btn-secondary btn-sm" onclick="FAM.renderDetail(${a ? a.id : 0})">Open profile</button>
+          ${buttons}
+        </div>`;
+      }
+      const r = item.r;
+      const a = fs.assessors.find(x => x.id === r.assessor_id);
+      const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
+      const { statusChip, noteChip, buttons } = followUpActionsHtml('registration', r.id, r.assessor_id, item.kind);
+      return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a ? a.full_name : 'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(r.seta_name)}</span></div>
+          <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(roleLabel)} &middot; ${escapeHtml(r.registration_number || 'no reg number')}</div>
+          ${noteChip}
+        </div>
+        ${statusChip}${riskBadgeHtml(item.kind, item.days)}
+        <button class="btn btn-secondary btn-sm" onclick="FAM.renderDetail(${a ? a.id : 0})">Open profile</button>
+        ${buttons}
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- render: detail panel ----------
+  function renderDetail(assessorId) {
+    fs.selectedAssessorId = assessorId;
+    renderTable();
+    const a = fs.assessors.find(x => String(x.id) === String(assessorId));
+    const panel = document.getElementById('fam-detail-panel');
+    if (!a) { panel.innerHTML = `<div class="empty-note" style="padding:24px;">Practitioner not found.</div>`; return; }
+
+    const regs = regsFor(assessorId);
+    const bySeta = {};
+    regs.forEach(r => { (bySeta[r.seta_name] ||= []).push(r); });
+
+    const regsHtml = Object.keys(bySeta).length ? Object.entries(bySeta).map(([seta, list]) => `
+      <div class="reg-group">
+        <div class="reg-group-head"><span>${escapeHtml(seta)}</span><span style="color:var(--text-muted);font-weight:400;">${list.length} reg${list.length === 1 ? '' : 's'}</span></div>
+        ${list.map(r => {
+          const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
+          return `<div class="reg-card">
+            <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regRiskState(r) === 'pending' ? 'needs_review' : (regRiskState(r) === 'expired' ? 'expired' : (regIsActive(r) ? 'active' : 'inactive')))}</div>
+            <div>${r.scope.length ? r.scope.map(s => `<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
+          </div>`;
+        }).join('')}
+      </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
+
+    const allDocs = fs.documents.filter(d => d.assessor_id === assessorId);
+    const currentDocs = allDocs.filter(d => d.is_current !== false);
+    const historyByType = {};
+    allDocs.filter(d => d.is_current === false).forEach(d => { (historyByType[d.doc_type] ||= []).push(d); });
+    Object.values(historyByType).forEach(list => list.sort((a, b) => (b.version || 0) - (a.version || 0)));
+
+    const docsHtml = currentDocs.length ? `<div class="doc-grid">${currentDocs.map(d => {
+      const hist = historyByType[d.doc_type] || [];
+      const histId = `fam-doc-hist-${d.id}`;
+      return `
+      <div class="doc-card ${d.status === 'Missing' ? 'missing' : ''}">
+        <div class="name">${escapeHtml(d.doc_type)}${d.version > 1 ? ` <span style="opacity:.6;font-weight:400;">v${d.version}</span>` : ''}</div>
+        <div class="meta">${escapeHtml(d.status)}${d.doc_date ? ' · ' + d.doc_date : ''}</div>
+        <div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
+          ${d.file_url ? `<button class="fam-small-link" onclick="FAM.viewDocument('${escapeHtml(d.file_url)}')">View file</button>` : ''}
+          ${isAdmin() && d.file_url ? `<button class="fam-small-link" onclick="FAM.openReplaceDocument(${d.id})">Replace</button>` : ''}
+          ${hist.length ? `<button class="fam-small-link" onclick="FAM.toggleDocHistory('${histId}')">History (${hist.length})</button>` : ''}
+        </div>
+        ${hist.length ? `<div id="${histId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);">
+          ${hist.map(h => `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">v${h.version || 1} · superseded ${h.superseded_at ? h.superseded_at.slice(0, 10) : ''}${h.file_url ? ` · <button class="fam-small-link" onclick="FAM.viewDocument('${escapeHtml(h.file_url)}')">View file</button>` : ''}</div>`).join('')}
+        </div>` : ''}
+      </div>`;
+    }).join('')}</div>`
+      : `<div class="empty-note">No documents captured yet.</div>`;
+
+    const initials = (a.full_name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    panel.innerHTML = `
+      <div class="detail-header">
+        <div class="avatar" style="width:48px;height:48px;font-size:16px;">${initials}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;font-family:var(--font-serif);">${escapeHtml(a.full_name)}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${a.id_number ? escapeHtml(a.id_number) : 'ID not captured'}</div>
+        </div>
+        ${statusPillHtml(overallStatus(assessorId))}
+      </div>
+      <div class="detail-body">
+        <div>
+          <div class="detail-section-title">Contact record</div>
+          <div class="kv-grid" style="margin-top:8px;">
+            <div><div class="k">Phone</div>${a.phone ? escapeHtml(a.phone) : '&mdash;'}</div>
+            <div><div class="k">Email</div>${a.email ? escapeHtml(a.email) : '&mdash;'}</div>
+            <div style="grid-column:1/-1;"><div class="k">Address</div>${a.physical_address ? escapeHtml(a.physical_address) : '&mdash;'}</div>
+          </div>
+        </div>
+        <div>
+          <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Registrations &amp; scope</span>
+            <button class="fam-small-link" onclick="FAM.openAddRegistration(${assessorId})">+ Add registration</button>
+          </div>
+          <div style="margin-top:8px;">${regsHtml}</div>
+        </div>
+        <div>
+          <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Supporting documents</span>
+            <button class="fam-small-link" onclick="FAM.openAddDocument(${assessorId})">+ Add document</button>
+          </div>
+          <div style="margin-top:8px;">${docsHtml}</div>
+        </div>
+      </div>`;
+  }
+
+  // Entry point for the badge deep-link (famStatusBadgeHtml) and the
+  // #view=fam&assessor=<id> hash link — switches straight to a practitioner's
+  // profile, loading FAM data first if this is the first time the tab has
+  // been opened this session.
+  async function openAssessor(assessorId) {
+    if (!fs.loaded) { await init(); }
+    renderDetail(assessorId);
+  }
+
+  // ---------- modals ----------
+  function openAddPractitioner() {
+    ['fam-pr-name', 'fam-pr-idnum', 'fam-pr-email', 'fam-pr-phone', 'fam-pr-address'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fam-pr-error').textContent = '';
+    openModal('fam-modal-practitioner');
+  }
+  async function savePractitioner() {
+    const name = document.getElementById('fam-pr-name').value.trim();
+    if (!name) { document.getElementById('fam-pr-error').textContent = 'Full name is required.'; return; }
+    if (!fs.tenantId) { document.getElementById('fam-pr-error').textContent = 'No tenant on your account — contact an admin.'; return; }
+    try {
+      await api('assessors', { method: 'POST', body: JSON.stringify({
+        tenant_id: fs.tenantId,
+        full_name: name,
+        id_number: document.getElementById('fam-pr-idnum').value || null,
+        email: document.getElementById('fam-pr-email').value || null,
+        phone: document.getElementById('fam-pr-phone').value || null,
+        physical_address: document.getElementById('fam-pr-address').value || null,
+      }) });
+      closeModal('fam-modal-practitioner');
+      showToast('success', 'Practitioner added.');
+      await loadAll();
+    } catch (e) { document.getElementById('fam-pr-error').textContent = 'Failed to save: ' + e.message; }
+  }
+
+  function openAddRegistration(assessorId) {
+    document.getElementById('fam-rg-assessor-id').value = assessorId;
+    document.querySelectorAll('.fam-rg-role-cb').forEach(cb => cb.checked = false);
+    document.getElementById('fam-rg-status').value = 'Active';
+    document.getElementById('fam-rg-scope').selectedIndex = -1;
+    document.getElementById('fam-rg-error').textContent = '';
+    openModal('fam-modal-registration');
+  }
+  async function saveRegistration() {
+    const assessorId = document.getElementById('fam-rg-assessor-id').value;
+    const roles = [...document.querySelectorAll('.fam-rg-role-cb:checked')].map(cb => cb.value);
+    const status = document.getElementById('fam-rg-status').value;
+    if (!roles.length) { document.getElementById('fam-rg-error').textContent = 'Select at least one role.'; return; }
+    if (!fs.tenantId) { document.getElementById('fam-rg-error').textContent = 'No tenant on your account.'; return; }
+    const scopeIds = [...document.getElementById('fam-rg-scope').selectedOptions].map(o => o.value);
+    const setaNames = [...new Set(scopeIds.map(id => (fs.qualifications.find(q => q.id === id) || {}).seta).filter(s => s && s !== 'N/A'))];
+    try {
+      const [created] = await api('fam_seta_registrations', { method: 'POST', body: JSON.stringify({
+        tenant_id: fs.tenantId,
+        assessor_id: Number(assessorId),
+        seta_name: setaNames.length ? setaNames.join(', ') : 'N/A',
+        role: roles[0],
+        roles,
+        status,
+      }) });
+      if (scopeIds.length) {
+        await api('fam_registration_scope', { method: 'POST', body: JSON.stringify(
+          scopeIds.map(qid => ({ tenant_id: fs.tenantId, registration_id: created.id, qualification_id: qid }))
+        ) });
+      }
+      closeModal('fam-modal-registration');
+      showToast('success', 'Registration added.');
+      await loadAll();
+      renderDetail(Number(assessorId));
+    } catch (e) { document.getElementById('fam-rg-error').textContent = 'Failed to save: ' + e.message; }
+  }
+
+  function openAddDocument(assessorId) {
+    document.getElementById('fam-dc-title').textContent = 'Add / update document';
+    document.getElementById('fam-dc-replace-note').style.display = 'none';
+    document.getElementById('fam-dc-assessor-id').value = assessorId;
+    document.getElementById('fam-dc-replace-of').value = '';
+    document.getElementById('fam-dc-type').disabled = false;
+    document.getElementById('fam-dc-type').value = 'CV';
+    document.getElementById('fam-dc-status').value = 'Missing';
+    document.getElementById('fam-dc-date').value = '';
+    document.getElementById('fam-dc-file').value = '';
+    document.getElementById('fam-dc-file-label').textContent = 'Upload file';
+    document.getElementById('fam-dc-error').textContent = '';
+    openModal('fam-modal-document');
+  }
+
+  // Admin-only: uploads a new file as the next version of an existing
+  // document and marks the current row superseded — immutable history,
+  // nothing is ever deleted. (Already shipped/live on the standalone page;
+  // ported as-is.)
+  function openReplaceDocument(docId) {
+    if (!isAdmin()) { showToast('error', 'Only admins can replace a document.'); return; }
+    const d = fs.documents.find(x => x.id === docId);
+    if (!d) { showToast('error', 'Document not found — try reloading.'); return; }
+    document.getElementById('fam-dc-title').textContent = `Replace ${d.doc_type} — v${(d.version || 1) + 1}`;
+    document.getElementById('fam-dc-replace-note').style.display = 'block';
+    document.getElementById('fam-dc-assessor-id').value = d.assessor_id;
+    document.getElementById('fam-dc-replace-of').value = docId;
+    document.getElementById('fam-dc-type').value = d.doc_type;
+    document.getElementById('fam-dc-type').disabled = true;
+    document.getElementById('fam-dc-status').value = 'Current';
+    document.getElementById('fam-dc-date').value = '';
+    document.getElementById('fam-dc-file').value = '';
+    document.getElementById('fam-dc-file-label').textContent = 'New file *';
+    document.getElementById('fam-dc-error').textContent = '';
+    openModal('fam-modal-document');
+  }
+
+  function toggleDocHistory(elId) {
+    const el = document.getElementById(elId);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  const MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_DOC_MIME_TYPES = [
+    'application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg', 'image/png',
+  ];
+  const ALLOWED_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+
+  function validateDocumentFile(file) {
+    if (file.size > MAX_DOC_SIZE_BYTES) {
+      throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB) — the limit is 10 MB.`);
+    }
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const typeOk = file.type ? ALLOWED_DOC_MIME_TYPES.includes(file.type) : ALLOWED_DOC_EXTENSIONS.includes(ext);
+    if (!typeOk) {
+      throw new Error('Unsupported file type — please upload a PDF, Word document, or JPG/PNG image.');
+    }
+  }
+  async function uploadDocumentFile(file, tenantId, assessorId) {
+    validateDocumentFile(file);
+    const path = `${tenantId}/${assessorId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/fam-documents/${path}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY),
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+    if (!res.ok) throw new Error('File upload failed: ' + (await res.text()));
+    return path;
+  }
+  async function viewDocument(path) {
+    try {
+      const { data, error } = await sb.storage.from('fam-documents').createSignedUrl(path, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank', 'noopener');
+    } catch (e) { showToast('error', 'Could not open file: ' + e.message); }
+  }
+  async function saveDocument() {
+    const assessorId = document.getElementById('fam-dc-assessor-id').value;
+    const docType = document.getElementById('fam-dc-type').value;
+    const replaceOfRaw = document.getElementById('fam-dc-replace-of').value;
+    const replaceOfId = replaceOfRaw ? Number(replaceOfRaw) : null;
+    if (!fs.tenantId) { document.getElementById('fam-dc-error').textContent = 'No tenant on your account.'; return; }
+    if (replaceOfId && !isAdmin()) { document.getElementById('fam-dc-error').textContent = 'Only admins can replace a document.'; return; }
+    const saveBtn = document.querySelector('#fam-modal-document .btn-gold');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try {
+      const fileInput = document.getElementById('fam-dc-file');
+      const file = fileInput.files && fileInput.files[0];
+      if (replaceOfId && !file) { throw new Error('Choose a replacement file.'); }
+      let fileUrl = null;
+      if (file) fileUrl = await uploadDocumentFile(file, fs.tenantId, assessorId);
+      let uploaderEmail = null;
+      if (file) {
+        const { data: { user } } = await sb.auth.getUser();
+        uploaderEmail = user ? user.email : null;
+      }
+      if (replaceOfId) {
+        const oldDoc = fs.documents.find(x => x.id === replaceOfId);
+        if (!oldDoc) throw new Error('Original document not found — try reloading.');
+        const [created] = await api('fam_documents', { method: 'POST', body: JSON.stringify({
+          tenant_id: fs.tenantId,
+          assessor_id: Number(assessorId),
+          doc_type: oldDoc.doc_type,
+          status: document.getElementById('fam-dc-status').value,
+          doc_date: document.getElementById('fam-dc-date').value || null,
+          version: (oldDoc.version || 1) + 1,
+          is_current: true,
+          file_url: fileUrl,
+          file_name: file.name,
+          file_size_bytes: file.size,
+          mime_type: file.type || null,
+          uploaded_by: uploaderEmail,
+          uploaded_at: new Date().toISOString(),
+        }) });
+        await api(`fam_documents?id=eq.${replaceOfId}`, { method: 'PATCH', body: JSON.stringify({
+          is_current: false,
+          superseded_at: new Date().toISOString(),
+          superseded_by: created ? created.id : null,
+        }) });
+      } else {
+        await api('fam_documents', { method: 'POST', body: JSON.stringify({
+          tenant_id: fs.tenantId,
+          assessor_id: Number(assessorId),
+          doc_type: docType,
+          status: document.getElementById('fam-dc-status').value,
+          doc_date: document.getElementById('fam-dc-date').value || null,
+          ...(fileUrl ? {
+            file_url: fileUrl,
+            file_name: file.name,
+            file_size_bytes: file.size,
+            mime_type: file.type || null,
+            uploaded_by: uploaderEmail,
+            uploaded_at: new Date().toISOString(),
+          } : {}),
+        }) });
+      }
+      closeModal('fam-modal-document');
+      showToast('success', replaceOfId ? 'Document replaced — previous version kept as history.' : 'Document saved.');
+      await loadAll();
+      renderDetail(Number(assessorId));
+    } catch (e) { document.getElementById('fam-dc-error').textContent = 'Failed to save: ' + e.message; }
+    finally { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+  }
+
+  fs.activeTab = 'all';
+
+  return {
+    init, loadAll, renderTable, setTab, setShowDismissed,
+    openAssessor, renderDetail,
+    openAddPractitioner, savePractitioner,
+    openAddRegistration, saveRegistration,
+    openAddDocument, openReplaceDocument, saveDocument, toggleDocHistory, viewDocument,
+    claimFollowUp, dismissFollowUp, reopenFollowUp, noteFollowUp,
+  };
+})();
+</script>
 </body>
 </html>
 
