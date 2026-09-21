@@ -1,0 +1,22 @@
+-- Stop client-side DELETE requests against fam_documents from returning a
+-- misleading successful 200 with zero affected rows. There is no DELETE RLS
+-- policy on this table (by design -- documents are never hard-deleted, only
+-- superseded via the versioned-replacement flow), so a DELETE previously
+-- passed the GRANT check, got filtered to 0 rows by RLS, and PostgREST
+-- reported success. Revoking the table-level DELETE grant from anon/
+-- authenticated makes that same request fail with a real permission-denied
+-- (42501) -> PostgREST 403, instead of a silent no-op.
+--
+-- service_role is untouched (needs full access for admin/backend tooling).
+-- No application code path calls DELETE on this table (verified: neither
+-- fam-registry.html nor the fam-sync-worker edge function does), so this is
+-- zero behavior change for every real request pattern.
+--
+-- Verified live against nducwhlmudksgxggjrbo on 2026-09-21:
+--   - `set local role authenticated; delete from fam_documents where id=...;`
+--     -> ERROR 42501 permission denied for table fam_documents
+--   - same for `set local role anon;`
+--   - has_table_privilege('service_role', 'public.fam_documents', 'DELETE') = true (unchanged)
+--   - has_table_privilege('authenticated', 'public.fam_documents', 'INSERT'/'UPDATE'/'SELECT') = true (unchanged)
+
+revoke delete on public.fam_documents from authenticated, anon;
