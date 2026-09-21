@@ -738,10 +738,40 @@
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">EISA Readiness</span><select id="vm-eisa-readiness" class="filter-select" style="width:100%;"><option value="">Select</option><option value="Ready">Ready</option><option value="Not Ready">Not Ready</option><option value="In Progress">In Progress</option></select></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Logbook Status</span><select id="vm-logbook" class="filter-select" style="width:100%;"><option value="">Select</option><option value="Signed">Signed</option><option value="Not Signed">Not Signed</option><option value="Partial">Partial</option></select></div>
         <div class="filter-group" style="margin-bottom:20px;"><span class="filter-label">Next Monitoring Date</span><input id="vm-next-date" type="date" class="filter-input" style="width:100%;"></div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="generateAIVisitReport(currentVisitModalId)">&#10024; AI Report</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="generateAIRecommendations(currentVisitModalId)">&#10024; Draft Recommendations</button>
+        </div>
         <div style="display:flex;gap:10px;">
             <button class="btn btn-secondary" style="flex:1;" onclick="closeVisitModal()">Cancel</button>
             <button class="btn btn-secondary" style="flex:1;" onclick="printVisitReport(currentVisitModalId)">&#128424; Print</button>
             <button class="btn btn-gold" style="flex:1;" id="vm-save-btn" onclick="saveVisitModal()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- AI VISIT REPORT MODAL -->
+<div id="ai-visit-report-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
+        <h2 style="font-size:16px;margin-bottom:4px;">AI Visit Report</h2>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;" id="ai-visit-report-summary"></p>
+        <div id="ai-visit-report-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:16px;min-height:120px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('ai-visit-report-modal')">Close</button>
+            <button class="btn btn-gold" style="flex:1;" onclick="copyAIVisitReport()">&#128203; Copy Text</button>
+        </div>
+    </div>
+</div>
+
+<!-- AI DRAFT RECOMMENDATIONS MODAL -->
+<div id="ai-recommendations-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
+        <h2 style="font-size:16px;margin-bottom:4px;">Draft Recommendations from Low KMA Scores</h2>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;" id="ai-rec-summary"></p>
+        <div id="ai-rec-body" style="flex:1;overflow-y:auto;margin-bottom:16px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('ai-recommendations-modal')">Cancel</button>
+            <button class="btn btn-gold" style="flex:1;" id="ai-rec-save-btn" onclick="saveAIRecommendations()">Save Selected</button>
         </div>
     </div>
 </div>
@@ -5822,6 +5852,174 @@ function openVisitModal(recordId) {
 }
 
 function closeVisitModal() { closeModal('visit-modal'); currentVisitModalId = null; }
+
+// ===================== AI: Visit Report & Recommendation Drafting =====================
+const KMA_DOMAIN_LABELS = {
+    KMA1: 'Programme Implementation',
+    KMA2: 'Human Resources',
+    KMA3: 'Assessment Strategy',
+    KMA4: 'Progress on Implementation',
+    KMA5: 'General Responsiveness',
+    KMA6: 'E-learning'
+};
+
+async function callAIGenerate(payload, timeoutMs = 45000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+            body: JSON.stringify(payload),
+            signal: ctrl.signal
+        });
+        clearTimeout(t);
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || j.ok === false) throw new Error((j && j.error) || res.statusText || 'AI request failed');
+        return j;
+    } catch (e) {
+        clearTimeout(t);
+        throw e;
+    }
+}
+
+let _aiVisitReportText = '';
+
+async function generateAIVisitReport(recordId) {
+    if (!recordId) { showToast('error','Save the visit first'); return; }
+    const rec = state.monitoring.find(r => String(r.id) === String(recordId));
+    if (!rec) { showToast('error','Visit not found'); return; }
+    const f = rec.fields || {};
+    const progName = pickName(f['Programme Name']) || '';
+
+    document.getElementById('ai-visit-report-summary').textContent = `${progName} Â· ${f['Date of Visit']||''} Â· ${f['Venue']||''}`;
+    document.getElementById('ai-visit-report-body').textContent = 'Generating reportâ¦';
+    _aiVisitReportText = '';
+    openModal('ai-visit-report-modal');
+
+    try {
+        const j = await callAIGenerate({ type: 'visit_report', visit_id: Number(recordId) });
+        _aiVisitReportText = j.report || '';
+        document.getElementById('ai-visit-report-body').textContent = _aiVisitReportText || '(No report text returned)';
+    } catch (e) {
+        console.error(e);
+        document.getElementById('ai-visit-report-body').textContent = 'Failed to generate report: ' + (e.message || e);
+    }
+}
+
+function copyAIVisitReport() {
+    if (!_aiVisitReportText) { showToast('error','Nothing to copy yet'); return; }
+    navigator.clipboard.writeText(_aiVisitReportText).then(
+        () => showToast('success','Report copied to clipboard'),
+        () => showToast('error','Copy failed')
+    );
+}
+
+let _aiRecDrafts = []; // { domain, domainLabel, score, text, priority, dueDate, include }
+
+function _addDaysISO(dateStr, days) {
+    const base = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(base.getTime())) return '';
+    base.setDate(base.getDate() + days);
+    return base.toISOString().slice(0, 10);
+}
+
+function _parseRecommendationDraft(raw, visitDate) {
+    const recMatch = raw.match(/Recommendation:\s*([\s\S]*?)(?:\n\s*Priority:|$)/i);
+    const prioMatch = raw.match(/Priority:\s*(High|Medium|Low)/i);
+    const dueMatch = raw.match(/Due:\s*\+?\s*(\d+)\s*days?/i);
+    const text = (recMatch ? recMatch[1] : raw).trim();
+    const priority = prioMatch ? prioMatch[1] : 'Medium';
+    const days = dueMatch ? parseInt(dueMatch[1], 10) : 30;
+    return { text, priority, dueDate: _addDaysISO(visitDate, days) };
+}
+
+async function generateAIRecommendations(recordId) {
+    if (!recordId) { showToast('error','Save the visit first'); return; }
+    const rec = state.monitoring.find(r => String(r.id) === String(recordId));
+    if (!rec) { showToast('error','Visit not found'); return; }
+    const f = rec.fields || {};
+    const progName = pickName(f['Programme Name']) || '';
+    const visitDate = f['Date of Visit'] || '';
+
+    const lowDomains = Object.keys(KMA_DOMAIN_LABELS).filter(k => {
+        const score = f[k] ? Number(f[k]) : 0;
+        return score > 0 && score < 3;
+    });
+
+    document.getElementById('ai-rec-summary').textContent = `${progName} Â· ${visitDate}`;
+    const body = document.getElementById('ai-rec-body');
+
+    if (!lowDomains.length) {
+        body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No KMA domains scored below 3 (Mostly Compliant) â nothing to draft.</p>';
+        _aiRecDrafts = [];
+        openModal('ai-recommendations-modal');
+        return;
+    }
+
+    body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Drafting recommendations for: ' +
+        lowDomains.map(k => `${k} (${KMA_DOMAIN_LABELS[k]})`).join(', ') + 'â¦</p>';
+    _aiRecDrafts = [];
+    openModal('ai-recommendations-modal');
+
+    try {
+        const results = await Promise.all(lowDomains.map(async k => {
+            const score = Number(f[k]);
+            const j = await callAIGenerate({ type: 'recommendation_draft', visit_id: Number(recordId), kma_domain: k, score });
+            const parsed = _parseRecommendationDraft(j.draft || '', visitDate);
+            return { domain: k, domainLabel: j.domain_label || KMA_DOMAIN_LABELS[k], score, ...parsed, include: true };
+        }));
+        _aiRecDrafts = results;
+        _renderAIRecDrafts();
+    } catch (e) {
+        console.error(e);
+        body.innerHTML = `<p style="color:var(--danger,#e55);font-size:13px;">Failed to draft recommendations: ${(e.message||e)}</p>`;
+    }
+}
+
+function _renderAIRecDrafts() {
+    const body = document.getElementById('ai-rec-body');
+    if (!_aiRecDrafts.length) { body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No drafts.</p>'; return; }
+    body.innerHTML = _aiRecDrafts.map((d, i) => `
+        <div style="border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:8px;padding:12px;margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:8px;">
+                <input type="checkbox" ${d.include ? 'checked' : ''} onchange="_aiRecDrafts[${i}].include=this.checked">
+                KMA${d.domain.replace('KMA','')} â ${d.domainLabel} (score ${d.score}/4) Â· Priority:
+                <select style="font-size:12px;" onchange="_aiRecDrafts[${i}].priority=this.value">
+                    ${['High','Medium','Low'].map(p => `<option value="${p}" ${d.priority===p?'selected':''}>${p}</option>`).join('')}
+                </select>
+            </label>
+            <textarea class="filter-input" style="width:100%;min-height:60px;font-size:12.5px;margin-bottom:8px;" oninput="_aiRecDrafts[${i}].text=this.value">${d.text}</textarea>
+            <div class="filter-group"><span class="filter-label">Due Date</span><input type="date" class="filter-input" style="width:180px;" value="${d.dueDate||''}" onchange="_aiRecDrafts[${i}].dueDate=this.value"></div>
+        </div>
+    `).join('');
+}
+
+async function saveAIRecommendations() {
+    const selected = _aiRecDrafts.filter(d => d.include && d.text.trim());
+    if (!selected.length) { showToast('error','Nothing selected to save'); return; }
+    const visitId = currentVisitModalId;
+    try {
+        for (const d of selected) {
+            const fields = {
+                'Text': `[${d.priority}] ${d.text.trim()}`,
+                'Visit': visitId ? [visitId] : [],
+                'Owner': '',
+                'Due Date': d.dueDate || null,
+                'Status': 'Open'
+            };
+            await createRecord('Recommendations', fields);
+        }
+        closeModal('ai-recommendations-modal');
+        await loadRecommendations();
+        await loadWorklists();
+        showToast('success', `${selected.length} recommendation(s) added`);
+    } catch (e) {
+        console.error(e);
+        showToast('error','Failed to save one or more recommendations');
+    }
+}
+
 
 // ===================== OFFLINE INDICATOR =====================
 function initOfflineIndicator() {
