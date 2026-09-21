@@ -6536,6 +6536,31 @@ function handleSignatureUpload(file){
   reader.readAsDataURL(file);
 }
 
+// ── AI narrative polish: rewrites a deterministic draft as natural prose via the
+// ai-generate edge function's narrative_polish type. Preserves every number/date/
+// name exactly (enforced server-side). Returns null on any failure so callers can
+// fall back silently to the deterministic draft that's already in the textarea.
+async function polishNarrativeAI(fieldKey,draftText,facts){
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),20000);
+    const r=await fetch(`${SB_URL}/functions/v1/ai-generate`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({type:'narrative_polish',field_key:fieldKey,draft_text:draftText,facts}),
+      signal:ctrl.signal
+    });
+    clearTimeout(t);
+    if(!r.ok)return null;
+    const j=await r.json();
+    if(!j.ok||!j.polished)return null;
+    return j.polished;
+  }catch(e){
+    console.warn('AI narrative polish failed, keeping deterministic draft:',e);
+    return null;
+  }
+}
+
 // ── Draft-from-data: pre-fills a narrative textarea with live cohort numbers ──
 function draftNarrative(key, btn){
   const pLearners=getProgrammeLearners();
@@ -6654,6 +6679,22 @@ function draftNarrative(key, btn){
     syncNar(ta);
   }
   btn.disabled=false;btn.textContent='✨ Draft from data';
+
+  // Ask the AI to rewrite the mechanical draft as natural prose (numbers/names
+  // preserved exactly, enforced server-side). If it fails or times out, the
+  // deterministic draft already in the textarea stands as-is — no user-visible
+  // failure. If the user has since edited the field, don't clobber their edit.
+  if(ta&&draft){
+    const facts={avg_attendance_pct:avgAtt,sessions:attDates.length,learners:total,threshold:ATT_THRESHOLD,below_threshold:belowThreshold,module_stats:modStats,eisa_booked:eisaBookedCount,eisa_completed:eisaCompletedCount};
+    btn.disabled=true;btn.textContent='✨ Polishing…';
+    polishNarrativeAI(key,draft,facts).then(polished=>{
+      btn.disabled=false;btn.textContent='✨ Draft from data';
+      if(polished&&ta.value===draft){
+        ta.value=polished;
+        syncNar(ta);
+      }
+    });
+  }
 }
 
 // ── Draft-All Review Panel ────────────────────────────────────────────────────
