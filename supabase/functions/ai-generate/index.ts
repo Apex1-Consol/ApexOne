@@ -24,9 +24,10 @@ const QCTO_SYSTEM_CONTEXT = `You are an AI assistant for ApexU, a South African 
 Terminology: SDP = Skills Development Provider, SETA = Sector Education and Training Authority,
 EISA = External Integrated Summative Assessment, KMA = Key Monitoring Area (1-6),
 PoE = Portfolio of Evidence, MOU = Memorandum of Understanding, PM = Project Manager.
-KMA domains: 1=Governance & Management, 2=Teaching & Learning, 3=Learner Support,
-4=Assessment Practices, 5=Infrastructure & Resources, 6=Stakeholder Engagement.
-KMA scores: 1=Non-compliant, 2=Partially Compliant, 3=Compliant, 4=Exceeds Requirements.
+KMA domains: 1=Programme Implementation, 2=Human Resources, 3=Assessment Strategy,
+4=Progress on Implementation, 5=General Responsiveness, 6=E-learning (N/A if not applicable).
+KMA scores: 1=Non-compliant, 2=Partially compliant, 3=Mostly compliant, 4=Fully compliant.
+Overall Judgment scores: 1=Unacceptable, 2=Not Yet Adequate, 3=Adequate, 4=Outstanding.
 Write professionally but clearly. Use South African English. Be specific with numbers.
 Flag risks directly. Do not hedge or use filler.`;
 
@@ -180,25 +181,35 @@ async function generateVisitReport(visitId: number) {
   }
 
   const system = `You are a QCTO monitoring visit report writer. Write a structured visit report following South African QCTO standards.
-KMA domains: 1=Governance & Management, 2=Teaching & Learning, 3=Learner Support, 4=Assessment Practices, 5=Infrastructure & Resources, 6=Stakeholder Engagement.
-Scores: 1=Non-compliant, 2=Partially Compliant, 3=Compliant, 4=Exceeds Requirements.
-Structure: Visit Summary, KMA Analysis (per domain), Overall Assessment, Recommendations, Next Steps.
+KMA domains: 1=Programme Implementation, 2=Human Resources, 3=Assessment Strategy, 4=Progress on Implementation, 5=General Responsiveness, 6=E-learning (N/A if not applicable).
+KMA scores: 1=Non-compliant, 2=Partially compliant, 3=Mostly compliant, 4=Fully compliant.
+Overall Judgment scores: 1=Unacceptable, 2=Not Yet Adequate, 3=Adequate, 4=Outstanding.
+Structure: Visit Summary, KMA Analysis (per domain), Learner Statistics, Overall Assessment, Recommendations, Next Steps.
 Flag any KMA below 3 as requiring attention. Be specific and actionable.`;
 
   const prompt = `Generate a monitoring visit report:
 - Programme: ${progName}
 - Date: ${f["Date of Visit"] || "N/A"}
 - Venue: ${f.Venue || "N/A"}
-- KMA1 (Governance): ${f.KMA1 || "-"}/4
-- KMA2 (Teaching & Learning): ${f.KMA2 || "-"}/4
-- KMA3 (Learner Support): ${f.KMA3 || "-"}/4
-- KMA4 (Assessment): ${f.KMA4 || "-"}/4
-- KMA5 (Infrastructure): ${f.KMA5 || "-"}/4
-- KMA6 (Stakeholder): ${f.KMA6 || "-"}/4
-- Overall Judgment: ${f["Overall Judgment"] || f.Overall || "-"}/4
+- QCTO Personnel: ${f["QCTO Personnel"] || "N/A"}
+- KMA1 (Programme Implementation): ${f.KMA1 || "-"}/4
+- KMA2 (Human Resources): ${f.KMA2 || "-"}/4
+- KMA3 (Assessment Strategy): ${f.KMA3 || "-"}/4
+- KMA4 (Progress on Implementation): ${f.KMA4 || "-"}/4
+- KMA5 (General Responsiveness): ${f.KMA5 || "-"}/4
+- KMA6 (E-learning): ${f.KMA6 || "-"}/4
+- Overall Judgment: ${f["Overall Judgment"] || "-"}/4
 - EISA Readiness: ${f["EISA Readiness"] || "N/A"}
-- Next Visit: ${f["Next Visit Date"] || "N/A"}
-- Notes: ${f["Visit Notes"] || "None"}`;
+- Logbook Status: ${f["Logbook Status"] || "N/A"}
+- MOU Signed: ${f["MOU Signed"] ? "Yes" : "No"}
+- Learners Enrolled: ${f["Learners Enrolled"] ?? "N/A"}
+- Learners on Course for EISA: ${f["Learners on Course for EISA"] ?? "N/A"}
+- Dropouts: ${f["Dropouts"] ?? "N/A"}${f["Dropout Reasons"] ? ` (${f["Dropout Reasons"]})` : ""}
+- Special Needs Count: ${f["Special Needs Count"] ?? "N/A"}
+- Knowledge Facilitator: ${f["Knowledge Facilitator"] || "N/A"}
+- Practical Facilitator: ${f["Practical Facilitator"] || "N/A"}
+- Workplace Mentor: ${f["Workplace Mentor"] || "N/A"}
+- Next Monitoring Date: ${f["Next Monitoring Date"] || "N/A"}`;
 
   const report = await callGemini(prompt, system);
   return { visit_id: visitId, programme: progName, date: f["Date of Visit"], report };
@@ -399,11 +410,15 @@ async function generateRecommendationDraft(visitId: number, kmaDomain: string, s
   const { data: visit, error: vErr } = await supabase.from("monitoring_visits").select("*").eq("id", visitId).single();
   if (vErr || !visit) throw Error(`Visit ${visitId} not found: ${vErr?.message}`);
   const f = visit.fields || {};
-  const progName = f["Programme Name"]?.[0] || `Programme ${visit.programme_id ?? ""}`;
+  let progName = f["Programme Name"]?.[0] || `Programme ${visit.programme_id ?? ""}`;
+  if (visit.programme_id) {
+    const { data: prog } = await supabase.from("programmes").select("fields").eq("id", Number(visit.programme_id)).single();
+    if (prog) progName = prog.fields?.Qualification || prog.fields?.Name || prog.fields?.name || progName;
+  }
 
   const domainNames: Record<string, string> = {
-    KMA1: "Governance & Management", KMA2: "Teaching & Learning", KMA3: "Learner Support",
-    KMA4: "Assessment Practices", KMA5: "Infrastructure & Resources", KMA6: "Stakeholder Engagement",
+    KMA1: "Programme Implementation", KMA2: "Human Resources", KMA3: "Assessment Strategy",
+    KMA4: "Progress on Implementation", KMA5: "General Responsiveness", KMA6: "E-learning",
   };
   const domainLabel = domainNames[kmaDomain] || kmaDomain;
 
@@ -413,9 +428,10 @@ Priority: <High|Medium|Low>
 Due: <+N days>`;
 
   const prompt = `Visit for ${progName}, date ${f["Date of Visit"] || "N/A"}.
-Domain: ${kmaDomain} (${domainLabel}), score ${score}/4 (1=Non-compliant, 2=Partially Compliant, 3=Compliant, 4=Exceeds).
-Visit notes: ${f["Visit Notes"] || "None"}
-Venue: ${f.Venue || "N/A"}`;
+Domain: ${kmaDomain} (${domainLabel}), score ${score}/4 (1=Non-compliant, 2=Partially compliant, 3=Mostly compliant, 4=Fully compliant).
+Venue: ${f.Venue || "N/A"}
+QCTO Personnel: ${f["QCTO Personnel"] || "N/A"}
+Logbook Status: ${f["Logbook Status"] || "N/A"}`;
 
   const draft = await callGemini(prompt, system);
   return { visit_id: visitId, kma_domain: kmaDomain, domain_label: domainLabel, score, draft };
