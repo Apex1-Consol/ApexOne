@@ -497,6 +497,13 @@
 #view-fam .doc-card.missing .meta{color:var(--accent-rose);}
 #view-fam .fam-small-link{font-size:11px;color:var(--accent-cyan);cursor:pointer;background:none;border:none;padding:0;}
 #view-fam .empty-note{font-size:11.5px;color:var(--text-muted);font-style:italic;padding:6px 0;}
+#view-fam .scope-pill{font-size:10px;font-weight:700;padding:4px 8px;border-radius:999px;display:inline-block;}
+#view-fam .scope-pill.scope-match{background:rgba(59,109,17,.22);color:#8FC463;}
+#view-fam .scope-pill.scope-review{background:rgba(212,165,55,.2);color:#E8C468;}
+#view-fam .scope-pill.ready{background:rgba(59,109,17,.30);color:#a7e08c;}
+#view-fam select.scope-target{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-subtle);padding:6px;border-radius:6px;}
+#view-fam .scope-approval-disabled{opacity:.5;cursor:not-allowed!important;}
+@media (max-width:900px){#view-fam #fam-si-tbody{min-width:800px;}}
 </style>
 </head>
 <body>
@@ -1588,6 +1595,7 @@
                 </div>
             </section>
             <section id="view-fam" class="view-panel" data-roles="admin,qa_specialist,etqa,demo">
+                <div id="fam-main-content">
                 <div class="fam-banner" id="fam-renewal-banner" style="display:none;"></div>
 
                 <div class="stat-row" id="fam-stat-row"></div>
@@ -1599,6 +1607,7 @@
                             <div class="container-actions">
                                 <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.loadAll()">&#8635; Refresh</button>
+                                <button class="btn btn-secondary btn-sm" onclick="FAM.openScopeImport()">Scope Import</button>
                                 <button class="btn btn-gold btn-sm" onclick="FAM.openAddPractitioner()">+ Add practitioner</button>
                             </div>
                         </div>
@@ -1639,6 +1648,36 @@
 
                     <div class="detail-panel" id="fam-detail-panel">
                         <div class="empty-note" style="padding:24px;">Select a practitioner to see their full profile.</div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- Scope Import: bulk qualification-catalogue import/approval. Ported from
+                     the standalone fam-registry.html (real, in-use feature -- audit log shows
+                     5 commits, most recently 3 days before this was ported). Toggled by
+                     swapping visibility with #fam-main-content above rather than a modal,
+                     since the catalogue table needs real width. -->
+                <div id="fam-scope-import" style="display:none;">
+                    <div class="fam-banner">
+                        <span><strong>Safe import:</strong> catalogue rows are staged for review and do not change confirmed scope.</span>
+                        <button class="btn btn-secondary btn-sm" onclick="FAM.closeScopeImport()">Back to registry</button>
+                    </div>
+                    <div class="content-container">
+                        <div class="container-header">
+                            <h2>Qualification catalogue</h2>
+                            <span style="font-size:11px;color:var(--text-muted);">98 cleaned rows &middot; SAQA ID first, title second</span>
+                        </div>
+                        <div class="filter-row">
+                            <input id="fam-si-search" placeholder="Search SAQA ID, title or SETA" oninput="FAM.renderScopeImport()">
+                            <select id="fam-si-seta" onchange="FAM.renderScopeImport()"><option value="">All SETAs</option></select>
+                            <button id="fam-si-approve" class="btn btn-gold btn-sm" disabled onclick="FAM.approveScope()">Approve selected</button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th></th><th>Qualification</th><th>SETA</th><th>Level / credits</th><th>Target registration</th><th>Decision</th></tr></thead>
+                                <tbody id="fam-si-tbody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -10189,6 +10228,97 @@ const FAM = (function () {
     finally { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
   }
 
+  // ---------- Scope Import (bulk qualification-catalogue import/approval) ----------
+  // Ported as-is from the standalone fam-registry.html -- a real, actively-used
+  // feature (audit log: 5 commits before this port), not part of the original
+  // fold-in design but kept rather than dropped. Same catalogue data, same
+  // commit logic (writes fam_registration_scope + an audit_log row), adapted
+  // only to this namespace's ids/state/helpers.
+  const scopeCatalogue=[{"saqa_id": "20185", "qualification_name": "Further Education and Training Certificate: Banking", "seta": "BANK SETA", "nqf_level": "4", "credits": "120.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "20186", "qualification_name": "National Certificate: Banking", "seta": "BANK SETA", "nqf_level": "5", "credits": "120.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "96099", "qualification_name": "National Certificate: Generic Management: Customer Management: Banking", "seta": "BANK SETA", "nqf_level": "5", "credits": "162.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "96100", "qualification_name": "National Certificate: Generic Management: General Management: Banking", "seta": "BANK SETA", "nqf_level": "5", "credits": "162.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "96101", "qualification_name": "National Certificate: Generic Management: Skills Development Management: Banking", "seta": "BANK SETA", "nqf_level": "5", "credits": "162.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "96102", "qualification_name": "National Certificate: Generic Management: Strategic Management: Banking", "seta": "BANK SETA", "nqf_level": "5", "credits": "162.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "121927", "qualification_name": "Higher Occupational Certificate: Business Banking Officer", "seta": "QCTO", "nqf_level": "5", "credits": "146.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "120117", "qualification_name": "Occupational Certificate: Business Banking Practitioner", "seta": "QCTO", "nqf_level": "6", "credits": "202.0", "duration": "18 months", "company": "Catalyst.AI"}, {"saqa_id": "121911", "qualification_name": "Advanced Occupational Diploma: Business Banker", "seta": "QCTO", "nqf_level": "7", "credits": "592.0", "duration": "36 months", "company": "Catalyst.AI"}, {"saqa_id": "66610", "qualification_name": "Further Education and Training Certificate: Short Term Insurance", "seta": "INSETA", "nqf_level": "4", "credits": "150.0", "duration": "12  months ", "company": "Apex Business Academy"}, {"saqa_id": "57918", "qualification_name": "National Certificate: Short Term Insurance", "seta": "INSETA", "nqf_level": "5", "credits": "120.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "66611", "qualification_name": "National Certificate: Wealth Management", "seta": "INSETA", "nqf_level": "5", "credits": "120.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "99668", "qualification_name": "Occupational Certificate: Insurance Claims Administrator (Insurance Claims Assessor)", "seta": "QCTO", "nqf_level": "4", "credits": "131.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "105026", "qualification_name": "Occupational Certificate: Financial Advisor", "seta": "QCTO", "nqf_level": "6", "credits": "515.0", "duration": "36 months", "company": "Catalyst.AI"}, {"saqa_id": "105021", "qualification_name": "Occupational Certificate: Investment Adviser", "seta": "QCTO", "nqf_level": "6", "credits": "213.0", "duration": "18 months", "company": "Catalyst.AI"}, {"saqa_id": "105022", "qualification_name": "Occupational Certificate: Long Term Insurance Adviser", "seta": "QCTO", "nqf_level": "5", "credits": "180.0", "duration": "18 months", "company": "Catalyst.AI"}, {"saqa_id": "105025", "qualification_name": "Occupational Certificate: Employee and Pension Fund Benefit Adviser", "seta": "QCTO", "nqf_level": "5", "credits": "110.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "105030", "qualification_name": "Occupational Certificate: Health Care Benefits Advisor", "seta": "QCTO", "nqf_level": "5", "credits": "102.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "117238", "qualification_name": "Occupational Certificate: Financial Markets Practitioner", "seta": "QCTO", "nqf_level": "7", "credits": "180.0", "duration": "18 months", "company": "Catalyst.AI"}, {"saqa_id": "117329", "qualification_name": "Occupational Certificate: Insurance Underwriter", "seta": "QCTO", "nqf_level": "5", "credits": "163.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "118708", "qualification_name": "Occupational Certificate: Data Science Practitioner", "seta": "QCTO", "nqf_level": "5", "credits": "185.0", "duration": "24 months", "company": "Catalyst.AI"}, {"saqa_id": "61591/49077", "qualification_name": "National Certificate: Information Technology: End User Computing", "seta": "MICT SETA", "nqf_level": "3", "credits": "130.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "48573", "qualification_name": "National Certificate: Information Technology: Systems Support", "seta": "MICT SETA", "nqf_level": "5", "credits": "147.0", "duration": "12 months ", "company": "Apex Business Academy | Catalyst.AI"}, {"saqa_id": "118707", "qualification_name": "Occupational Certificate: Software Developer", "seta": "QCTO", "nqf_level": "5", "credits": "220.0", "duration": "24 months", "company": "Catalyst.AI"}, {"saqa_id": "119458", "qualification_name": "Occupational Certificate: Software Engineer", "seta": "QCTO", "nqf_level": "6", "credits": "240.0", "duration": "24 months", "company": "Catalyst.AI"}, {"saqa_id": "63769", "qualification_name": "National Certificate: Business Analysis Support Practice", "seta": "MICT SETA", "nqf_level": "5", "credits": "138.0", "duration": "12 months ", "company": "Apex Business Academy | Catalyst.AI"}, {"saqa_id": "63909", "qualification_name": "National Certificate: Business Analysis", "seta": "MICT SETA", "nqf_level": "6", "credits": "149.0", "duration": "12 months ", "company": "Apex Business Academy | Catalyst.AI"}, {"saqa_id": "118699", "qualification_name": "Occupational Certificate: Cloud Administrator", "seta": "QCTO", "nqf_level": "4", "credits": "149.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "118792", "qualification_name": "Occupational Certificate: Artificial Intelligence Software Developer", "seta": "QCTO", "nqf_level": "5", "credits": "209.0", "duration": "18 months", "company": "Catalyst.AI"}, {"saqa_id": "58345", "qualification_name": "Further Education and Training Certificate: Food Manufacturing Management", "seta": "FOODBEV SETA", "nqf_level": "4", "credits": "150.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "57694", "qualification_name": "National Certificate: Food and Beverage Packaging Operations", "seta": "FOODBEV SETA", "nqf_level": "3", "credits": "120.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "49743", "qualification_name": "National Certificate: Manufacturing Management", "seta": "FOODBEV SETA", "nqf_level": "5", "credits": "121.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "58026", "qualification_name": "General Education and Training Certificate: Food and Beverage Handling Processes", "seta": "FOODBEV SETA", "nqf_level": "1", "credits": "128.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "66249", "qualification_name": "Further Education and Training Certificate: New Venture Creation", "seta": "SERVICES SETA", "nqf_level": "4", "credits": "149.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "91671", "qualification_name": "Occupational Certificate: Compliance Officer", "seta": "QCTO", "nqf_level": "6", "credits": "240.0", "duration": "24 months", "company": "Apex Business Academy"}, {"saqa_id": "59201/60269", "qualification_name": "National Certificate: Generic Management", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "162.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "101876", "qualification_name": "Occupational Certificate: Management Assistant", "seta": "QCTO", "nqf_level": "5", "credits": "316.0", "duration": "24 months", "company": "Apex Business Academy"}, {"saqa_id": "102161", "qualification_name": "Occupational Certificate: Office Administrator", "seta": "QCTO", "nqf_level": "5", "credits": "445.0", "duration": "36 months", "company": "Apex Business Academy"}, {"saqa_id": "94222", "qualification_name": "Occupational Certificate: Organisational Risk Practitioner", "seta": "QCTO", "nqf_level": "6", "credits": "125.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "97387", "qualification_name": "Occupational Certificate: Organisational Risk Manager", "seta": "QCTO", "nqf_level": "8", "credits": "265.0", "duration": "24 months", "company": "Catalyst.AI"}, {"saqa_id": "101869", "qualification_name": "Occupational Certificate: Project Manager", "seta": "QCTO", "nqf_level": "5", "credits": "240.0", "duration": "24 months", "company": "Apex Business Academy"}, {"saqa_id": "58395", "qualification_name": "National Certificate: Project Management", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "120.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "111445", "qualification_name": "Occupational Certificate: Procurement Officer", "seta": "QCTO", "nqf_level": "5", "credits": "180.0", "duration": "18 months", "company": "Apex Business Academy"}, {"saqa_id": "99111", "qualification_name": "Occupational Certificate: Supply Chain Practitioner", "seta": "QCTO", "nqf_level": "5", "credits": "180.0", "duration": "18 months", "company": "Apex Business Academy"}, {"saqa_id": "111357", "qualification_name": "Occupational Certificate: Supply Chain Manager", "seta": "QCTO", "nqf_level": "6", "credits": "180.0", "duration": "18 months", "company": "Apex Business Academy"}, {"saqa_id": "99669", "qualification_name": "Occupational Certificate: Sales Assistant (General) (Retail Sales Advisor)", "seta": "QCTO", "nqf_level": "3", "credits": "54.0", "duration": "6 months", "company": "Apex Business Academy"}, {"saqa_id": "99573", "qualification_name": "Occupational Certificate: Retail Supervisor", "seta": "QCTO", "nqf_level": "4", "credits": "100.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "103150", "qualification_name": "Occupational Certificate: Retail Chain Store Manager", "seta": "QCTO", "nqf_level": "5", "credits": "106.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "73269", "qualification_name": "National Certificate: Contact Centre Support", "seta": "SERVICES SETA", "nqf_level": "2", "credits": "128.0", "duration": "12 months ", "company": "Apex Business Academy"}, {"saqa_id": "99687", "qualification_name": "Occupational Certificate: Contact Centre Manager", "seta": "QCTO", "nqf_level": "5", "credits": "285.0", "duration": "24 months", "company": "Apex Business Academy"}, {"saqa_id": "101321", "qualification_name": "Occupational Certificate: Training and Development Practitioner", "seta": "QCTO", "nqf_level": "5", "credits": "190.0", "duration": "24 months", "company": "Apex Business Academy"}, {"saqa_id": "118705", "qualification_name": "Occupational Certificate: Design Thinking Practitioner", "seta": "QCTO", "nqf_level": "4", "credits": "100.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "118788", "qualification_name": "Occupational Certificate: Design Thinking Innovation Lead", "seta": "QCTO", "nqf_level": "4", "credits": "160.0", "duration": "12 months ", "company": "Catalyst.AI"}, {"saqa_id": "48971", "qualification_name": "National Certificate: Mixed Farming Systems", "seta": "AGRI SETA", "nqf_level": "1", "credits": "120.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "48977", "qualification_name": "National Certificate: Mixed Farming Systems", "seta": "AGRI SETA", "nqf_level": "2", "credits": "120.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "48972", "qualification_name": "National Certificate: Plant Production", "seta": "AGRI SETA", "nqf_level": "1", "credits": "120.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "48975", "qualification_name": "National Certificate: Plant Production", "seta": "AGRI SETA", "nqf_level": "2", "credits": "120.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "49052", "qualification_name": "National Certificate: Plant Production", "seta": "AGRI SETA", "nqf_level": "3", "credits": "120.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "49009", "qualification_name": "National Certificate: Plant Production", "seta": "AGRI SETA", "nqf_level": "4", "credits": "142.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "49580", "qualification_name": "General Education and Training Certificate: Poultry Production", "seta": "AGRI SETA", "nqf_level": "1", "credits": "134.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "49582", "qualification_name": "National Certificate: Poultry Production", "seta": "AGRI SETA", "nqf_level": "2", "credits": "133.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "49578", "qualification_name": "National Certificate: Poultry Production", "seta": "AGRI SETA", "nqf_level": "3", "credits": "138.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "14851", "qualification_name": "National Certificate: Agri Trade Processes", "seta": "AGRI SETA", "nqf_level": "2", "credits": "125.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "14854", "qualification_name": "National Certificate: Agric Sales and Services", "seta": "AGRI SETA", "nqf_level": "4", "credits": "161.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "23154", "qualification_name": "National Certificate: Grain Handling Processes", "seta": "AGRI SETA", "nqf_level": "3", "credits": "126.0", "duration": "12 months ", "company": "Pulse Afrika"}, {"saqa_id": "14873", "qualification_name": "National Diploma: Grain Handling Management", "seta": "AGRI SETA", "nqf_level": "6", "credits": "240.0", "duration": "18 months", "company": "Pulse Afrika"}, {"saqa_id": "104904", "qualification_name": "Occupational Certificate: Aquaculture Farm Worker", "seta": "QCTO", "nqf_level": "2", "credits": "71.0", "duration": "6 months", "company": "Pulse Afrika"}, {"saqa_id": "101867", "qualification_name": "Occupational Certificate: Viticulture Worker", "seta": "QCTO", "nqf_level": "2", "credits": "66.0", "duration": "6 months", "company": "Pulse Afrika"}, {"saqa_id": "104912", "qualification_name": "Occupational Certificate: Aquaculture Farmer", "seta": "QCTO", "nqf_level": "4", "credits": "176.0", "duration": "18 months", "company": "Pulse Afrika"}, {"saqa_id": "99256", "qualification_name": "Occupational Certificate: Crop Produce Analyst", "seta": "QCTO", "nqf_level": "5", "credits": "265.0", "duration": "24 months", "company": "Pulse Afrika"}, {"saqa_id": "252029, 252020, 252032 & 252037 ", "qualification_name": "Coaching and Mentoring", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "28.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "10067", "qualification_name": "Customer Experience Management", "seta": "BANK SETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "10066 & 10047", "qualification_name": "Fundamentals of Sales", "seta": "BANK SETA", "nqf_level": "5", "credits": "21.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "252037, 120300 & 15224", "qualification_name": "Management & Leadership", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "18.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "12433, 252031 & 252024", "qualification_name": "Powerful Presentations: From Basics to Brilliance  (Presentation Skills)", "seta": "BANK SETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "252027, 252031, 114226 & 117853", "qualification_name": "Workplace Mastery", "seta": "BANK SETA", "nqf_level": "5", "credits": "26.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "118688", "qualification_name": "Occupational Certificate: Skills Programme Grain Grader", "seta": "AGRI SETA", "nqf_level": "4", "credits": "46.0", "duration": "3 months", "company": "Pulse Afrika"}, {"saqa_id": "115367 & 258838 ", "qualification_name": "AI Essentials", "seta": "MICT SETA", "nqf_level": "6", "credits": "14.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "12891 & 13107", "qualification_name": "Advanced Cyber Security", "seta": "MICT SETA", "nqf_level": "5", "credits": "10.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "258836 & 115385", "qualification_name": "Data Essentials", "seta": "MICT SETA", "nqf_level": "5", "credits": "15.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "114048, 114049, 114055, 10135, 114051, 114059 & 114069", "qualification_name": "Data Science Dynamics", "seta": "MICT SETA", "nqf_level": "5", "credits": "51.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "114049, 114048  & 120379 (10135) ", "qualification_name": "Power BI", "seta": "MICT SETA", "nqf_level": "5", "credits": "24.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "10066 & 10047", "qualification_name": "Sales Techniques (customised for call centre)", "seta": "BANK SETA", "nqf_level": "5", "credits": "21.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "10066 & 10047", "qualification_name": "Sales Effectiveness & Relationship Management (Sales Function)", "seta": "BANK SETA", "nqf_level": "5", "credits": "21.0", "duration": "3 months ", "company": "Catalyst.AI"}, {"saqa_id": "264403, 252026 & 264406", "qualification_name": "Critical Thinking and Decision Making", "seta": "BANK SETA", "nqf_level": "5", "credits": "17.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "12138 & 13107 ", "qualification_name": "Fundamentals of Data Science", "seta": "MICT SETA", "nqf_level": "6", "credits": "15.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "12891 & 13099", "qualification_name": "Fundamentals of Software Development", "seta": "MICT SETA", "nqf_level": "6", "credits": "21.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "252043 & 252027", "qualification_name": "Diversity and Inclusion", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "12.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "252032 & 252022", "qualification_name": "Change Mangement", "seta": "BANK SETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": " 12433, 114226 & 252025", "qualification_name": "Customer Service Skills Programme", "seta": "SERVICES SETA", "nqf_level": "5", "credits": "21.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "12433, 114226 & 252031", "qualification_name": "Customer Service Skills Programme", "seta": "BANK SETA", "nqf_level": "5", "credits": "20.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "10053, 10054 & 15214", "qualification_name": "Objection Handling and Customer Impact Management Programme", "seta": "BANK SETA", "nqf_level": "5", "credits": "17.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "12433 & 117853", "qualification_name": "Debit Collections", "seta": "BANK SETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "242594, 242573 & 230077", "qualification_name": "Debt Resolution and Customer Rehabilitation", "seta": "INSETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Apex Business Academy"}, {"saqa_id": "15214, 10054  & 12433 ", "qualification_name": "Customer Care, Communication & Telephone Skills", "seta": "BANK SETA", "nqf_level": "5", "credits": "16.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "240201", "qualification_name": "Occupational Skills Programme: Basic End User Computing", "seta": "QCTO", "nqf_level": "3", "credits": "30.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "240202", "qualification_name": "Occupational Skills Programme: Intermediate End User Computing", "seta": "QCTO", "nqf_level": "4", "credits": "20.0", "duration": "3 months", "company": "Catalyst.AI"}, {"saqa_id": "240203", "qualification_name": "Occupational Skills Programme: Advanced End User Computing", "seta": "QCTO", "nqf_level": "5", "credits": "30.0", "duration": "3 months", "company": "Catalyst.AI"}];
+
+  function openScopeImport(){
+    document.getElementById('fam-main-content').style.display = 'none';
+    document.getElementById('fam-scope-import').style.display = 'block';
+    const sel = document.getElementById('fam-si-seta');
+    sel.innerHTML = '<option value="">All SETAs</option>' + [...new Set(scopeCatalogue.map(row => row.seta))].sort().map(v => `<option>${escapeHtml(v)}</option>`).join('');
+    renderScopeImport();
+  }
+  function closeScopeImport(){
+    document.getElementById('fam-scope-import').style.display = 'none';
+    document.getElementById('fam-main-content').style.display = 'block';
+  }
+  function updateScopeReadiness(select){
+    const row = select.closest('tr'), pill = row && row.querySelector('.scope-pill');
+    if (!pill) return;
+    if (select.value) { pill.textContent = 'Ready to commit'; pill.className = 'scope-pill ready'; }
+    else { pill.textContent = 'Catalogue match'; pill.className = 'scope-pill scope-match'; }
+    updateApproveButton();
+  }
+  function updateApproveButton(){
+    const btn = document.getElementById('fam-si-approve');
+    if (!btn) return;
+    const checked = [...document.querySelectorAll('.fam-si-check:checked')];
+    const ready = checked.length > 0 && checked.every(x => x.closest('tr')?.querySelector('.scope-target')?.value);
+    btn.disabled = !ready;
+    btn.classList.toggle('scope-approval-disabled', !ready);
+  }
+  function scopeRegistrationLabel(reg){
+    const person = fs.assessors.find(a => String(a.id) === String(reg.assessor_id));
+    const name = person ? person.full_name : 'Unknown practitioner';
+    const seta = reg.seta_name || 'Unverified coverage';
+    const role = (reg.roles && reg.roles.length) ? reg.roles.join(' / ') : (reg.role || 'Role not captured');
+    const number = reg.registration_number ? ` · #${reg.registration_number}` : '';
+    const flag = reg.status === 'Pending Entry' ? ' · Needs review' : (seta === 'N/A' ? ' · Unverified coverage' : '');
+    return `${name} · ${seta} · ${role}${number}${flag}`;
+  }
+  function renderScopeImport(){
+    const q = (document.getElementById('fam-si-search').value || '').toLowerCase();
+    const seta = document.getElementById('fam-si-seta').value;
+    const filtered = scopeCatalogue.filter(row => (!q || Object.values(row).join(' ').toLowerCase().includes(q)) && (!seta || row.seta === seta));
+    document.getElementById('fam-si-tbody').innerHTML = filtered.slice(0, 100).map(row => `<tr>
+        <td><input type="checkbox" class="fam-si-check" data-saqa="${escapeHtml(row.saqa_id || '')}" data-title="${escapeHtml(row.qualification_name || '')}" onchange="FAM.updateApproveButton()"></td>
+        <td><b>${escapeHtml(row.qualification_name)}</b><div style="color:var(--text-muted);">SAQA ${escapeHtml(row.saqa_id || 'missing')} &middot; ${escapeHtml(row.company || '')}</div></td>
+        <td>${escapeHtml(row.seta)}</td>
+        <td>NQF ${escapeHtml(row.nqf_level || '&mdash;')} &middot; ${escapeHtml(row.credits || '&mdash;')}</td>
+        <td><select class="scope-target" onchange="FAM.updateScopeReadiness(this)"><option value="">Select registration</option>${fs.registrations.map(reg => `<option value="${escapeHtml(reg.id)}">${escapeHtml(scopeRegistrationLabel(reg))}</option>`).join('')}</select></td>
+        <td><span class="scope-pill ${row.saqa_id ? 'scope-match' : 'scope-review'}">${row.saqa_id ? 'Catalogue match' : 'Needs review'}</span></td>
+      </tr>`).join('') || '<tr><td colspan="6" style="padding:24px;color:var(--text-muted);">No rows match.</td></tr>';
+    updateApproveButton();
+  }
+  async function approveScope(){
+    updateApproveButton();
+    const btn = document.getElementById('fam-si-approve');
+    if (btn.disabled) { showToast('error', 'Select a target registration for every checked row first.'); return; }
+    const checks = [...document.querySelectorAll('.fam-si-check:checked')];
+    const commits = []; const skipped = [];
+    for (const check of checks) {
+      const row = check.closest('tr');
+      const registrationId = row?.querySelector('.scope-target')?.value;
+      const saqa = check.dataset.saqa; const title = check.dataset.title || '';
+      const qualification = fs.qualifications.find(q => String(q.saqa_id || '') === String(saqa)) || fs.qualifications.find(q => String(q.name || '').trim().toLowerCase() === title.trim().toLowerCase());
+      const reg = fs.registrations.find(r => String(r.id) === String(registrationId));
+      if (!registrationId || !qualification || !reg) { skipped.push(title || saqa || 'Unknown row'); continue; }
+      if ((reg.scope || []).some(x => String(x.qualification_id) === String(qualification.id))) { skipped.push(title + ' (already linked)'); continue; }
+      commits.push({ tenant_id: fs.tenantId, registration_id: Number(registrationId), qualification_id: qualification.id });
+    }
+    if (skipped.length) showToast('error', 'Skipped ' + skipped.length + ' row(s): ' + skipped.slice(0, 2).join(', '));
+    if (!commits.length) return;
+    btn.disabled = true; btn.textContent = 'Committing…';
+    try {
+      await api('fam_registration_scope', { method: 'POST', body: JSON.stringify(commits) });
+      const { data: { user } } = await sb.auth.getUser();
+      await api('audit_log', { method: 'POST', body: JSON.stringify({
+        tenant_id: fs.tenantId, action: 'SCOPE_IMPORT_COMMIT', table_name: 'fam_registration_scope', record_id: 'bulk',
+        user_name: user?.email || null, user_role: user?.app_metadata?.role || null,
+        changes: { count: commits.length, qualification_ids: commits.map(x => x.qualification_id), registration_ids: commits.map(x => x.registration_id) },
+      }) });
+      showToast('success', commits.length + ' scope row(s) committed and audited.');
+      await loadAll();
+      openScopeImport();
+    } catch (e) { showToast('error', 'Commit failed: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = 'Approve selected'; updateApproveButton(); }
+  }
+
   fs.activeTab = 'all';
 
   return {
@@ -10198,6 +10328,7 @@ const FAM = (function () {
     openAddRegistration, saveRegistration,
     openAddDocument, openReplaceDocument, saveDocument, toggleDocHistory, viewDocument,
     claimFollowUp, dismissFollowUp, reopenFollowUp, noteFollowUp,
+    openScopeImport, closeScopeImport, renderScopeImport, updateScopeReadiness, updateApproveButton, approveScope,
   };
 })();
 </script>
