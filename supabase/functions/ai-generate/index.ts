@@ -18,7 +18,7 @@ const authClient = createClient(
 );
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
 
 const QCTO_SYSTEM_CONTEXT = `You are an AI assistant for ApexU, a South African QCTO-accredited training provider.
 Terminology: SDP = Skills Development Provider, SETA = Sector Education and Training Authority,
@@ -406,6 +406,70 @@ ${risks.map((r) => `- ${r.programme}: attendance ${r.attendance_pct ?? "N/A"}%, 
   return { client: client.client_name, narrative, programmes: risks };
 }
 
+function _riskRating(count: number, amberAt: number, redAt: number): string {
+    if (count >= redAt) return "Red";
+    if (count >= amberAt) return "Amber";
+    return "Green";
+}
+
+async function generateSystemRiskScan() {
+    const today = new Date();
+    const in60 = new Date(today.getTime() + 60 * 86400000).toISOString().slice(0, 10);
+  
+    const [{ data: recs }, { data: expiringRegs }, { data: programmes }] = await Promise.all([
+          supabase.from("recommendations").select("*"),
+          supabase.from("fam_seta_registrations").select("*, assessors(full_name)").not("registration_expiry_date", "is", null).lte("registration_expiry_date", in60),
+          supabase.from("programmes").select("id, programme_name, fields, status, programme_status"),
+        ]);
+  
+    const overdueRecs = (recs || []).filter((r: any) => !r.resolved && r.fields?.["Due Date"] && new Date(r.fields["Due Date"]) < today);
+    const activeProgrammes = (programmes || []).filter((p: any) => {
+          const status = p.status || p.programme_status || p.fields?.Status;
+          return status !== "Completed";
+    });
+    const progIds = activeProgrammes.map((p: any) => p.id);
+    const { data: visits } = progIds.length
+          ? await supabase.from("monitoring_visits").select("*").in("programme_id", progIds).order("id", { ascending: false })
+          : { data: [] };
+    const latestVisitByProg: Record<number, any> = {};
+    for (const v of visits || []) {
+          if (v.programme_id && !latestVisitByProg[v.programme_id]) latestVisitByProg[v.programme_id] = v;
+    }
+    const staleProgrammes = activeProgrammes.filter((p: any) => {
+          const v = latestVisitByProg[p.id];
+          const d = v?.fields?.["Date of Visit"];
+          if (!d) return true;
+          return Math.floor((today.getTime() - new Date(d).getTime()) / 86400000) > 60;
+    });
+    const categories = [
+      {
+              category: "Overdue Recommendations",
+              count: overdueRecs.length,
+              rating: _riskRating(overdueRecs.length, 1, 5),
+              detail: overdueRecs.slice(0, 5).map((r: any) => r.fields?.Text || r.fields?.Recommendation || "untitled").join("; "),
+      },
+      {
+              category: "FAM Registrations Expiring (60d)",
+              count: (expiringRegs || []).length,
+              rating: _riskRating((expiringRegs || []).length, 1, 5),
+              detail: (expiringRegs || []).slice(0, 5).map((r: any) => r.assessors?.full_name || `assessor ${r.assessor_id}`).join(", "),
+      },
+      {
+              category: "Stale Programmes (no visit 60d+)",
+              count: staleProgrammes.length,
+              rating: _riskRating(staleProgrammes.length, 1, 4),
+              detail: staleProgrammes.slice(0, 5).map((p: any) => programmeLabel(p)).join(", "),
+      },
+        ];
+    const system = QCTO_SYSTEM_CONTEXT + `\nWrite a short (150-200 word) system-wide risk narrative for training-provider leadership, based on traffic-light categories (Green/Amber/Red). Call out Red and Amber items directly by name and recommend the single most urgent action. Do not repeat the raw counts already shown on the cards — focus on what to do about them.`;
+  
+    const prompt = `System-wide risk scan:
+    ${categories.map((c) => `- ${c.category} [${c.rating}]: ${c.count}${c.detail ? ` — ${c.detail}` : ""}`).join("\n")}`;
+  
+    const narrative = await callGemini(prompt, system);
+    return { narrative, risks: categories };
+}
+
 async function generateRecommendationDraft(visitId: number, kmaDomain: string, score: number) {
   const { data: visit, error: vErr } = await supabase.from("monitoring_visits").select("*").eq("id", visitId).single();
   if (vErr || !visit) throw Error(`Visit ${visitId} not found: ${vErr?.message}`);
@@ -722,8 +786,7 @@ Deno.serve(async (req: Request) => {
         result = await generateLearnerProgress(learner_id);
         break;
       case "risk_assessment":
-        if (!client_id) return j({ ok: false, error: "client_id required" }, 400);
-        result = await generateRiskAssessment(client_id);
+                result = client_id ? await generateRiskAssessment(client_id) : await generateSystemRiskScan();
         break;
       case "recommendation_draft":
         if (!visit_id || !kma_domain || score === undefined) return j({ ok: false, error: "visit_id, kma_domain, score required" }, 400);
