@@ -3382,13 +3382,13 @@ function getProgrammeType(progId){
   if(prog&&prog.programme_type)return prog.programme_type==='legacy'?'legacy':'occupational';
   try{return localStorage.getItem('apex_prog_type_'+progId)==='legacy'?'legacy':'occupational';}catch{return'occupational';}
 }
-function setProgrammeType(progId,val){
+function setProgrammeType(progId,val,opts){
   if(!progId)return;
   const type=val==='legacy'?'legacy':'occupational';
   const prog=programmes.find(p=>String(p.id)===String(progId));
   if(prog)prog.programme_type=type;
   try{localStorage.setItem('apex_prog_type_'+progId,type);}catch{}
-  sbPatch('programmes',progId,{programme_type:type}).catch(()=>{});
+  if(opts&&opts.persist===false)return;sbPatch('programmes',progId,{programme_type:type}).catch(err=>{console.error('setProgrammeType: failed to persist programme_type for',progId,err);});
 }
 function isLegacyProgramme(prog){
   return!!prog&&getProgrammeType(prog.id)==='legacy';
@@ -8509,11 +8509,11 @@ async function saveModal(){
       const saqa=mval('mf-saqa_id');
       if(!saqa){modalErr('SAQA ID is required.');btn.disabled=false;btn.textContent=modalMode==='edit'?'Save Changes':'Add';return;}
       const fid=document.getElementById('mf-facilitator_id')?.value;
-      const gs=document.getElementById('mf-group_size')?.value;
+      const gs=document.getElementById('mf-group_size')?.value;const chosenType=document.getElementById('mf-programme_type')?.value==='legacy'?'legacy':'occupational';
       const payload={
         tenant_id:TENANT_DB_ID,
         client_id:activeClient.id,
-        programme_name:name,
+        programme_name:name,programme_type:chosenType,
         saqa_id:saqa,
         qualification_code:mval('mf-qualification_code')||null,
         facilitator_id:fid?+fid:null,
@@ -8587,8 +8587,8 @@ async function saveModal(){
         activeProgramme=saved;  // set before onProgrammeChange so generate button enables
       }
       // Persist Qualification Type (client-side — see getProgrammeType)
-      const chosenType=document.getElementById('mf-programme_type')?.value||'occupational';
-      setProgrammeType(saved.id,chosenType);
+      // chosenType now set above, before payload construction
+      setProgrammeType(saved.id,chosenType,{persist:false});
       updateProgTypeBadge();
       // Rebuild programme dropdown for current client
       const sel=document.getElementById('sel-programme');
