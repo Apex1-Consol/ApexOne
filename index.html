@@ -5944,52 +5944,31 @@ const KMA_DOMAIN_LABELS = {
     KMA6: 'E-learning'
 };
 
-// Auth for ai-generate: prefer the signed-in user's access token.
-// TEMPORARY: falls back to the publishable key until ai-generate drops isAnonAuth.
-// Never log tokens or keys - only the auth mode, type, status and timing.
-async function _aiAuthToken() {
-    try {
-        const client = window.supabase;
-        if (client && client.auth && typeof client.auth.getSession === 'function') {
-            const { data } = await client.auth.getSession();
-            const token = data && data.session && data.session.access_token;
-            if (token) return { token, mode: 'user' };
-        }
-    } catch (e) {
-        console.warn('[ai-generate] could not read session:', e && e.message);
-    }
-    return { token: SUPABASE_ANON_KEY, mode: 'publishable-fallback' };
-}
-
+// Auth for ai-generate: sends the signed-in user's access token.
+// ai-generate (v18+) no longer accepts the publishable key on its own.
+// Never log tokens or keys - only the type, status and timing.
 async function callAIGenerate(payload, timeoutMs = 45000) {
     const type = payload && payload.type;
     const started = Date.now();
-    const send = async (auth) => {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs);
-        try {
-            const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.token },
-                body: JSON.stringify(payload),
-                signal: ctrl.signal
-            });
-            const j = await res.json().catch(() => null);
-            return { res, j };
-        } finally {
-            clearTimeout(t);
-        }
-    };
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-        let auth = await _aiAuthToken();
-        if (auth.mode !== 'user') console.warn(`[ai-generate] ${type}: no user session, using publishable-key fallback`);
-        let { res, j } = await send(auth);
-        if (res.status === 401 && auth.mode === 'user') {
-            console.warn(`[ai-generate] ${type}: user token rejected (401), retrying with publishable-key fallback`);
-            auth = { token: SUPABASE_ANON_KEY, mode: 'publishable-fallback' };
-            ({ res, j } = await send(auth));
+        let token = null;
+        try {
+            const { data } = await window.supabase.auth.getSession();
+            token = data && data.session && data.session.access_token;
+        } catch (e) {
+            console.warn('[ai-generate] could not read session:', e && e.message);
         }
-        console.info(`[ai-generate] ${type}: auth=${auth.mode} status=${res.status} ${Date.now() - started}ms`);
+        if (!token) throw new Error('Not signed in - please sign in again to use AI features.');
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(payload),
+            signal: ctrl.signal
+        });
+        const j = await res.json().catch(() => null);
+        console.info(`[ai-generate] ${type}: status=${res.status} ${Date.now() - started}ms`);
         if (!res.ok || !j || j.ok === false) {
             if (res.status === 401) throw new Error('Not authorised to use AI features - please sign in again.');
             throw new Error((j && j.error) || res.statusText || 'AI request failed');
@@ -6002,6 +5981,8 @@ async function callAIGenerate(payload, timeoutMs = 45000) {
         }
         console.error(`[ai-generate] ${type}: ${e && e.message}`);
         throw e;
+    } finally {
+        clearTimeout(t);
     }
 }
 

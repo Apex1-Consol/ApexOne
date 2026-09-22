@@ -6562,7 +6562,7 @@ async function polishNarrativeAI(fieldKey,draftText,facts){
     const t=setTimeout(()=>ctrl.abort(),20000);
     const r=await fetch(`${SB_URL}/functions/v1/ai-generate`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+((await _sbAuth.auth.getSession()).data.session?.access_token||'')},
       body:JSON.stringify({type:'narrative_polish',field_key:fieldKey,draft_text:draftText,facts}),
       signal:ctrl.signal
     });
