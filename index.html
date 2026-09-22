@@ -347,6 +347,16 @@
         @keyframes shrink{from{width:100%;}to{width:0;}}
         @keyframes slideIn{from{transform:translateX(100%);opacity:0;}to{transform:translateX(0);opacity:1;}}
         .row-dirty td{border-left:3px solid var(--accent-gold);}
+        /* AI PANEL */
+        .btn-ai{background:rgba(212,165,55,0.15);color:var(--accent-gold);border-color:var(--accent-gold);}
+        .btn-ai:hover{background:rgba(212,165,55,0.28);}
+        .ai-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;color:var(--accent-gold);background:rgba(212,165,55,0.15);padding:2px 8px;border-radius:10px;margin-left:8px;letter-spacing:.3px;}
+        .ai-shimmer-line{height:13px;border-radius:4px;margin-bottom:9px;background:linear-gradient(90deg,rgba(255,255,255,0.05) 25%,rgba(255,255,255,0.14) 37%,rgba(255,255,255,0.05) 63%);background-size:400% 100%;animation:aiShimmer 1.4s ease infinite;}
+        @keyframes aiShimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+        .risk-card{border-left:4px solid var(--accent-emerald);background:rgba(255,255,255,0.03);border-radius:8px;padding:10px 12px;}
+        .risk-card .risk-cat{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;}
+        .risk-card .risk-count{font-size:22px;font-weight:700;line-height:1.3;}
+        .risk-card .risk-detail{font-size:10.5px;color:var(--text-muted);margin-top:2px;}
         /* MODAL */
         .modal-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;}
         .modal-overlay.hidden{display:none;}
@@ -921,6 +931,22 @@
                     <span>&#9888;</span>
                     <span id="expiry-banner-text"><strong>Accreditation expiring soon</strong></span>
                     <a onclick="switchTab('assessors')">View Assessors &rarr;</a>
+                </div>
+                <!-- AI INSIGHTS PANEL -->
+                <div class="content-container" id="dashboard-ai-panel" style="margin-bottom:16px;">
+                    <div class="container-header" style="cursor:pointer;" onclick="toggleDashboardAIPanel()">
+                        <h2>AI Insights<span class="ai-badge" id="dashboard-ai-badge" style="display:none;">&#10024; AI Generated</span></h2>
+                        <div class="container-actions">
+                            <button class="btn btn-ai btn-sm" onclick="event.stopPropagation();generateAIExecutiveSummary()">&#10024; Generate Executive Summary</button>
+                            <button class="btn btn-ai btn-sm" onclick="event.stopPropagation();generateAIRiskScan()">&#10024; Scan Risks</button>
+                            <span id="dashboard-ai-collapse-icon" style="font-size:11px;color:var(--text-muted);">&#9662;</span>
+                        </div>
+                    </div>
+                    <div id="dashboard-ai-body" style="padding:16px;display:none;">
+                        <div id="dashboard-ai-content" style="font-size:12.5px;line-height:1.55;white-space:pre-wrap;">
+                            <span style="color:var(--text-muted);font-size:11.5px;">Click &#8220;Generate Executive Summary&#8221; or &#8220;Scan Risks&#8221; for an AI-powered read on system-wide health.</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="metrics-grid">
                     <div class="metric-card accent-gold">
@@ -5915,7 +5941,71 @@ function copyAIVisitReport() {
     );
 }
 
-let _aiRecDrafts = []; // { domain, domainLabel, score, text, priority, dueDate, include }
+// // ===================== AI: Dashboard Insights Panel =====================
+    function toggleDashboardAIPanel(forceOpen) {
+        const body = document.getElementById('dashboard-ai-body');
+        const icon = document.getElementById('dashboard-ai-collapse-icon');
+        const open = forceOpen !== undefined ? forceOpen : body.style.display === 'none';
+        body.style.display = open ? 'block' : 'none';
+        if (icon) icon.innerHTML = open ? '&#9652;' : '&#9662;';
+    }
+    
+    function _aiShimmerHTML() {
+        return '<div class="ai-shimmer-line" style="width:92%;"></div><div class="ai-shimmer-line" style="width:78%;"></div><div class="ai-shimmer-line" style="width:85%;"></div><div class="ai-shimmer-line" style="width:60%;"></div>';
+    }
+    
+    function _aiPanelFail(context) {
+        document.getElementById('dashboard-ai-content').innerHTML =
+            `<span style="color:var(--text-muted);font-size:11.5px;">AI insight unavailable right now${context ? ' (' + escapeHtml(context) + ')' : ''} — the rest of the dashboard is unaffected. Try again shortly.</span>`;
+    }
+    async function generateAIExecutiveSummary() {
+        toggleDashboardAIPanel(true);
+        document.getElementById('dashboard-ai-badge').style.display = 'none';
+        document.getElementById('dashboard-ai-content').innerHTML = _aiShimmerHTML();
+    
+        try {
+            const j = await callAIGenerate({ type: 'executive_summary' });
+            const d = j.data_summary || {};
+            const enrolParts = Object.entries(d.enrolment_status || {}).map(([k, v]) => `${escapeHtml(k)}: ${v}`).join(', ');
+            const stats = `${d.total_learners ?? '—'} learners · ${d.active_programmes ?? '—'} active programmes` +
+                (enrolParts ? ` · ${enrolParts}` : '') +
+                ` · ${d.open_recommendations ?? '—'} open recommendations · ${d.expiring_registrations_60d ?? '—'} FAM registrations expiring in 60d`;
+            document.getElementById('dashboard-ai-content').innerHTML =
+                `<div style="font-size:10.5px;color:var(--text-muted);margin-bottom:10px;">${escapeHtml(stats)}</div>` +
+                `<div>${escapeHtml(j.narrative || '(No summary text returned)')}</div>`;
+            document.getElementById('dashboard-ai-badge').style.display = '';
+        } catch (e) {
+            console.error('generateAIExecutiveSummary error:', e);
+            _aiPanelFail(e.message || 'request failed');
+    }
+    }
+    
+    async function generateAIRiskScan() {
+        toggleDashboardAIPanel(true);
+        document.getElementById('dashboard-ai-badge').style.display = 'none';
+        document.getElementById('dashboard-ai-content').innerHTML = _aiShimmerHTML();
+    
+        try {
+            const j = await callAIGenerate({ type: 'risk_assessment' });
+            const risks = j.risks || [];
+            const colorFor = (r) => r === 'Red' ? 'var(--accent-rose)' : r === 'Amber' ? 'var(--accent-gold)' : 'var(--accent-emerald)';
+            const cardsHtml = risks.map(r => `
+                <div class="risk-card" style="border-left-color:${colorFor(r.rating)};">
+                    <div class="risk-cat">${escapeHtml(r.category || '')}</div>
+                    <div class="risk-count" style="color:${colorFor(r.rating)};">${r.count ?? 0}</div>
+                    <div class="risk-detail">${escapeHtml(r.rating || '')}${r.detail ? ' — ' + escapeHtml(r.detail) : ''}</div>
+</div>`).join('');
+            document.getElementById('dashboard-ai-content').innerHTML =
+                `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px;">${cardsHtml || '<span style="color:var(--text-muted);font-size:11.5px;">No risk categories returned.</span>'}</div>` +
+                `<div>${escapeHtml(j.narrative || '')}</div>`;
+            document.getElementById('dashboard-ai-badge').style.display = '';
+        } catch (e) {
+            console.error('generateAIRiskScan error:', e);
+            _aiPanelFail(e.message || 'request failed');
+    }
+    }
+    
+    let _aiRecDrafts = []; // { domain, domainLabel, score, text, priority, dueDate, include }
 
 function _addDaysISO(dateStr, days) {
     const base = dateStr ? new Date(dateStr) : new Date();
