@@ -18,6 +18,25 @@ This repo (Apex1-Consol/ApexOne) is the canonical source. A GitHub Actions workf
 
 Supabase project: apex-one (ref nducwhlmudksgxggjrbo), org ApexOne. The anon key embedded in the HTML is the public one - safe client-side; all real access control is enforced by RLS policies plus the signed-in user's JWT, not by keeping that key secret.
 
+## CAPTCHA / Turnstile configuration — single point of failure
+
+Three login surfaces embed a Cloudflare Turnstile widget: this repo's `index.html`,
+this repo's `report-generator.html`, and the separate `Apex1-Consol-apexu-reports`
+repo's `index.html` (client portal). **Supabase Auth holds exactly one Turnstile
+secret project-wide** (Dashboard -> Authentication -> Attack Protection -> Captcha
+secret) — it is not per-widget.
+
+All three surfaces' `data-sitekey` attributes must point at the *same* Turnstile
+widget as whatever secret is currently configured in Supabase. If you create a new
+Turnstile widget for one surface and update the Supabase secret to match it, the
+other two surfaces will start failing login with `captcha protection: request
+disallowed (invalid-input-secret)` — this has happened twice (2026-09-03, 2026-09-22).
+
+Before rotating or creating a Turnstile widget: either (a) reuse the existing site
+key across all three surfaces instead of creating a new one, or (b) if a new widget
+is genuinely needed, update the `data-sitekey` in all three files in the same change
+as the Supabase secret update.
+
 ## Accounts
 
 Users are created in the Supabase dashboard (Authentication -> Users -> Invite), with role and display name set under Raw App Meta Data - e.g. role: project_manager, name: Thabo N. Not Raw User Meta Data - that field is editable by the user themselves and isn't trusted for role checks.
@@ -37,4 +56,3 @@ fam-registry.html is a standalone page in this same repo, auto-deployed to apex1
 The schema is additive, not a replacement: public.assessors keeps its existing columns (seta_registration_number, accreditation_body, registration_expiry_date) untouched for backward compatibility, plus five new nullable columns (id_number, physical_address, gender, population_group, disability_status). Multi-SETA / multi-role registrations, scope of registration, supporting documents and contract/SLA status live in four new tables: public.fam_seta_registrations (one row per person x SETA x role), public.fam_registration_scope (which public.qualifications a registration covers - reuses the same qualifications table Programmes/EISA use), public.fam_documents, and public.fam_contracts. All four have RLS matching the existing owner_all pattern and are NOT wired into the ClickUp sync outbox yet (deliberately - that would need its own ClickUp list mapping, out of scope for the first cut).
 
 Why standalone first: this mirrors the project_initiator precedent above - build and use it independently while ApexOne's own tab structure catches up, then fold it in without a data migration since it's already reading the same tenant-scoped tables. Folding in later means: replacing the current Assessors & Moderators nav item (data-view="assessors") in index.html with the FAM Registry UI (or embedding it), reusing the same fetchRecords-style calls against fam_seta_registrations / fam_registration_scope / fam_documents / fam_contracts, and retiring fam-registry.html as a separate page once that's live. No bridge table is needed the way pi_bridge_synced is for project_initiator, because FAM Registry was never on a separate database to begin with.
-
