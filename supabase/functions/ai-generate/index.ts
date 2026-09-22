@@ -653,7 +653,7 @@ async function generatePoeGapAnalysis(programmeId: number) {
 
   const prompt = `Programme: ${progName}
   Learners with PoE records: ${perLearner.length}
-  ${perLearner.map((l) => `- ${l.learner}: ${l.total_items - l.missing.length}/${l.total_items} items complete. Missing: ${l.missing.join(", ") || "none"}`).join("\n") || "- none"}`;
+  ${perLearner.map((l: any) => `- ${l.learner}: ${l.total_items - l.missing.length}/${l.total_items} items complete. Missing: ${l.missing.join(", ") || "none"}`).join("\n") || "- none"}`;
 
   const narrative = await callGemini(prompt, system);
     return { programme: progName, narrative, per_learner: perLearner };
@@ -689,7 +689,7 @@ async function generateFamComplianceDigest() {
   const system = QCTO_SYSTEM_CONTEXT + `\nWrite a compliance digest covering all FAM (Facilitator/Assessor/Moderator) practitioners. For each flagged (Amber/Red) practitioner, state the specific issue. End with a short priority action list. Keep it under 500 words.`;
 
   const prompt = `FAM practitioners: ${digest.length}
-  ${digest.map((d) => `- ${d.assessor} [${d.rating}]: ${d.registrations} registrations (${d.expiring_60d} expiring within 60d), ${d.documents} current documents (missing: ${d.missing_doc_types.join(", ") || "none"}), ${d.open_follow_ups} open follow-ups`).join("\n")}`;
+  ${digest.map((d: any) => `- ${d.assessor} [${d.rating}]: ${d.registrations} registrations (${d.expiring_60d} expiring within 60d), ${d.documents} current documents (missing: ${d.missing_doc_types.join(", ") || "none"}), ${d.open_follow_ups} open follow-ups`).join("\n")}`;
 
   const narrative = await callGemini(prompt, system);
     return { narrative, practitioners: digest };
