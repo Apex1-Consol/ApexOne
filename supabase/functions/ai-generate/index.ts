@@ -298,6 +298,7 @@ async function generateProgrammeSummary(programmeId: number) {
   const narrative = await callGemini(prompt, system);
     return {
           programme: progName,
+        narrative,
           data_summary: {
                   enrolments: (enrolments || []).length,
                   enrolment_status: enrolStatus,
