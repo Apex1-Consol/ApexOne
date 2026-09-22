@@ -788,7 +788,32 @@
 
 <!-- PRINT REPORT AREA -->
 <div id="print-report-area" style="display:none;"></div>
+<!-- AI PROGRAMME SUMMARY MODAL -->
+    <div id="ai-programme-summary-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
+            <h2 style="font-size:16px;margin-bottom:4px;">AI Programme Summary <span class="ai-badge" id="ai-programme-summary-badge" style="display:none;">&#10024; AI Generated</span></h2>
+            <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;" id="ai-programme-summary-sub"></p>
+            <div id="ai-programme-summary-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:16px;min-height:120px;"></div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('ai-programme-summary-modal')">Close</button>
+                <button class="btn btn-gold" style="flex:1;" onclick="copyAIProgrammeSummary()">&#128203; Copy Text</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- AI LEARNER PROGRESS REPORT MODAL -->
+    <div id="ai-learner-progress-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
+            <h2 style="font-size:16px;margin-bottom:4px;">AI Learner Progress Report <span class="ai-badge" id="ai-learner-progress-badge" style="display:none;">&#10024; AI Generated</span></h2>
+            <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;" id="ai-learner-progress-sub"></p>
+            <div id="ai-learner-progress-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:16px;min-height:120px;"></div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('ai-learner-progress-modal')">Close</button>
+                <button class="btn btn-gold" style="flex:1;" onclick="copyAILearnerProgress()">&#128203; Copy Text</button>
+            </div>
+        </div>
+    </div>
+    
 <!-- APP SHELL -->
 <div id="app">
     <aside class="sidebar">
@@ -2033,9 +2058,11 @@
 
 <div id="add-recommendation-modal" class="modal-overlay hidden">
     <div class="modal-card" style="width:420px;">
-        <h2 style="font-size:16px;margin-bottom:20px;">Add Recommendation</h2>
-        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Text *</span><input id="ar-text" class="filter-input" type="text" style="width:100%;"></div>
+<h2 style="font-size:16px;margin-bottom:20px;">Add Recommendation <span class="ai-badge" id="ar-ai-badge" style="display:none;">&#10024; AI Drafted</span></h2>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Text *</span><input id="ar-text" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Visit</span><select id="ar-visit" class="filter-select" style="width:100%;"><option value="">-</option></select></div>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">KMA Domain (for AI Draft)</span><select id="ar-kma-domain" class="filter-select" style="width:100%;"><option value="">-</option><option value="KMA1">KMA1 — Programme Implementation</option><option value="KMA2">KMA2 — Human Resources</option><option value="KMA3">KMA3 — Assessment Strategy</option><option value="KMA4">KMA4 — Progress on Implementation</option><option value="KMA5">KMA5 — General Responsiveness</option><option value="KMA6">KMA6 — E-learning</option></select></div>
+            <div style="margin-bottom:10px;"><button class="btn btn-ai btn-sm" style="width:100%;" onclick="draftRecommendationFromVisit()">&#129302; AI Draft</button></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Owner</span><input id="ar-owner" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:20px;"><span class="filter-label">Due Date</span><input id="ar-due" class="filter-input" type="date" style="width:100%;"></div>
         <div style="display:flex;gap:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeModal('add-recommendation-modal')">Cancel</button><button class="btn btn-gold" style="flex:1;" onclick="saveNewRecommendation()">Save</button></div>
@@ -3793,6 +3820,7 @@ async function loadProgrammes() {
                 <td><input type="date" data-field="EISA End" class="filter-input" value="${escapeHtml(f['EISA End']||'')}"></td>
                 <td>
                     ${programmeStageActions(f, r.id)}
+                                        <button class="btn btn-ai btn-sm" onclick="generateAIProgrammeSummary('${r.id}')">&#128203; Summary</button>
                     <button class="btn btn-gold btn-sm" onclick="openEditProgramme('${r.id}')">Edit</button>
                     <button class="btn btn-secondary btn-sm" onclick="saveProgrammeRow('${r.id}')">Dates</button>
                     <button class="btn btn-secondary btn-sm" onclick="deleteRow('Programmes','${r.id}',loadProgrammes)">Del</button>
@@ -3893,7 +3921,7 @@ function renderLearnersTable(resetPage) {
             <td data-label="Phone">${escapeHtml(f['Phone']||'')}</td>
             <td data-label="Employment">${escapeHtml(f['Employment']||'')}</td>
             <td data-label="Programme">${escapeHtml(pickName(f['Programme Name']))}</td>
-            <td data-label="Actions"><button class="btn btn-secondary btn-sm" onclick="openEditLearner('${r.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="deleteRow('Learners','${r.id}',loadLearners)">Del</button></td>`;
+            <td data-label="Actions"><button class="btn btn-ai btn-sm" onclick="generateAILearnerProgress('${r.id}')">&#128196; Progress Report</button> <button class="btn btn-secondary btn-sm" onclick="openEditLearner('${r.id}')">Edit</button> <button class="btn btn-secondary btn-sm" onclick="deleteRow('Learners','${r.id}',loadLearners)">Del</button></td>`;
         tbody.appendChild(tr);
     });
 
@@ -4051,7 +4079,7 @@ async function loadRecommendations() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-record-id', r.id);
             tr.innerHTML = `
-                <td><input type="text" data-field="Text" class="filter-input" value="${escapeHtml(f['Text']||'')}"></td>
+                <td><input type="text" data-field="Text" class="filter-input" value="${escapeHtml(f['Text']||'')}">${f['AI Drafted'] ? '<span class="ai-badge" style="margin-left:6px;">&#10024; AI Drafted</span>' : ''}</td>
                 <td>${escapeHtml(visitDisplay)}</td>
                 <td><input type="text" data-field="Owner" class="filter-input" value="${escapeHtml(f['Owner']||'')}"></td>
                 <td><input type="date" data-field="Due Date" class="filter-input" value="${escapeHtml(f['Due Date']||'')}"></td>
@@ -6033,6 +6061,9 @@ function copyAIVisitReport() {
     }
     
     let _aiRecDrafts = []; // { domain, domainLabel, score, text, priority, dueDate, include }
+    let _aiProgrammeSummaryText = '';
+                let _aiLearnerProgressText = '';
+    let _arAIDrafted = false;
 
 function _addDaysISO(dateStr, days) {
     const base = dateStr ? new Date(dateStr) : new Date();
@@ -6136,6 +6167,89 @@ async function saveAIRecommendations() {
         showToast('error','Failed to save one or more recommendations');
     }
 }
+
+    async function generateAIProgrammeSummary(programmeId) {
+                const r = state.programmes.find(p => String(p.id) === String(programmeId));
+                        if (!r) { showToast('error', 'Programme not found'); return; }
+            const f = r.fields || {};
+            const name = f['Qualification'] || f['Name'] || f['name'] || `Programme ${programmeId}`;
+            const sub = document.getElementById('ai-programme-summary-sub');
+        const body = document.getElementById('ai-programme-summary-body');
+        const badge = document.getElementById('ai-programme-summary-badge');
+        if (sub) sub.textContent = name;
+        if (badge) badge.style.display = 'none';
+        if (body) body.innerHTML = _aiShimmerHTML();
+        openModal('ai-programme-summary-modal');
+        try {
+            const res = await callAIGenerate({ type: 'programme_summary', programme_id: Number(programmeId) });
+            _aiProgrammeSummaryText = res.narrative || '';
+            if (body) body.textContent = _aiProgrammeSummaryText || 'No summary generated.';
+            if (badge) badge.style.display = '';
+        } catch (e) {
+                    console.error(e);
+                if (body) body.innerHTML = '<p style="color:var(--text-muted);">Could not generate summary right now.</p>';
+}
+        }
+
+    function copyAIProgrammeSummary() {
+        if (!_aiProgrammeSummaryText) return;
+        navigator.clipboard.writeText(_aiProgrammeSummaryText).then(() => showToast('success', 'Copied to clipboard'));
+    }
+
+    async function generateAILearnerProgress(learnerId) {
+        const r = state.learners.find(l => String(l.id) === String(learnerId));
+        if (!r) { showToast('error', 'Learner not found'); return; }
+        const f = r.fields || {};
+        const name = [f['First Name'], f['Last Name']].filter(Boolean).join(' ') || `Learner ${learnerId}`;
+        const sub = document.getElementById('ai-learner-progress-sub');
+        const body = document.getElementById('ai-learner-progress-body');
+        const badge = document.getElementById('ai-learner-progress-badge');
+        if (sub) sub.textContent = name;
+        if (badge) badge.style.display = 'none';
+        if (body) body.innerHTML = _aiShimmerHTML();
+        openModal('ai-learner-progress-modal');
+        try {
+            const res = await callAIGenerate({ type: 'learner_progress', learner_id: Number(learnerId) });
+            _aiLearnerProgressText = res.narrative || '';
+            if (body) body.textContent = _aiLearnerProgressText || 'No report generated.';
+            if (badge) badge.style.display = '';
+    } catch (e) {
+            console.error(e);
+            if (body) body.innerHTML = '<p style="color:var(--text-muted);">Could not generate report right now.</p>';
+    }
+    }
+
+    function copyAILearnerProgress() {
+        if (!_aiLearnerProgressText) return;
+        navigator.clipboard.writeText(_aiLearnerProgressText).then(() => showToast('success', 'Copied to clipboard'));
+    }
+
+    async function draftRecommendationFromVisit() {
+        const visitId = document.getElementById('ar-visit')?.value;
+        const kmaDomain = document.getElementById('ar-kma-domain')?.value;
+        if (!visitId || !kmaDomain) { showToast('error', 'Select a Visit and a KMA Domain first'); return; }
+        const visit = state.monitoring.find(m => String(m.id) === String(visitId));
+        const score = visit?.fields?.[kmaDomain];
+        if (!score) { showToast('error', 'That visit has no score recorded for the selected KMA domain'); return; }
+        const btn = event?.target;
+        if (btn) { btn.disabled = true; btn.textContent = 'Drafting...'; }
+        try {
+            const res = await callAIGenerate({ type: 'recommendation_draft', visit_id: Number(visitId), kma_domain: kmaDomain, score: Number(score) });
+            const parsed = _parseRecommendationDraft ? _parseRecommendationDraft(res.draft || '') : { text: res.draft || '', due: '' };
+            const textEl = document.getElementById('ar-text');
+            const dueEl = document.getElementById('ar-due');
+            if (textEl) textEl.value = parsed.text || res.draft || '';
+            if (dueEl && parsed.due) dueEl.value = parsed.due;
+                    _arAIDrafted = true;
+                              const badge = document.getElementById('ar-ai-badge');
+                    if (badge) badge.style.display = '';
+        } catch (e) {
+                    console.error(e);
+            showToast('error', 'Could not draft a recommendation right now');
+    } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '🤖 AI Draft'; }
+    }
+    }
 
 
 // ===================== OFFLINE INDICATOR =====================
@@ -6791,7 +6905,7 @@ async function saveNewVisit() {
     catch(e) { console.error(e); showToast('error','Failed to create Visit'); }
 }
 
-function openAddRecommendationModal() { populateVisitSelects(); openModal('add-recommendation-modal'); }
+function openAddRecommendationModal() { populateVisitSelects(); const kd = document.getElementById('ar-kma-domain'); if (kd) kd.value = ''; const badge = document.getElementById('ar-ai-badge'); if (badge) badge.style.display = 'none'; _arAIDrafted = false; openModal('add-recommendation-modal'); }
 async function saveNewRecommendation() {
     const text = document.getElementById('ar-text').value.trim();
     if (!text) { showToast('error','Text is required'); return; }
@@ -6801,9 +6915,10 @@ async function saveNewRecommendation() {
         'Visit': visitId ? [visitId] : [],
         'Owner': document.getElementById('ar-owner').value,
         'Due Date': document.getElementById('ar-due').value || null,
-        'Status': 'Open'
+        'Status': 'Open',
+            'AI Drafted': _arAIDrafted
     };
-    try { await createRecord('Recommendations', fields); closeModal('add-recommendation-modal'); await loadRecommendations(); await loadWorklists(); showToast('success','Recommendation added'); }
+    try { await createRecord('Recommendations', fields); _arAIDrafted = false; closeModal('add-recommendation-modal'); await loadRecommendations(); await loadWorklists(); showToast('success','Recommendation added'); }
     catch(e) { console.error(e); showToast('error','Failed to add Recommendation'); }
 }
 
