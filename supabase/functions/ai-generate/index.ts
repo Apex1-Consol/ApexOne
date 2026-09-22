@@ -771,16 +771,14 @@ Deno.serve(async (req: Request) => {
              const authHeader = req.headers.get("authorization");
     const secret = req.headers.get("x-webhook-secret") || authHeader?.replace(/^Bearer\s+/i, "");
     const isSecretAuth = secret && SECRETS.includes(secret);
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const isAnonAuth = secret && secret === anonKey;
 
              let verifiedUser: any = null;
-    if (!isSecretAuth && !isAnonAuth && secret) {
+    if (!isSecretAuth && secret) {
           const { data: userData } = await authClient.auth.getUser(secret);
           verifiedUser = userData?.user || null;
     }
 
-             if (!isSecretAuth && !isAnonAuth && !verifiedUser) {
+             if (!isSecretAuth && !verifiedUser) {
                    return j({ ok: false, error: "Unauthorized" }, 401);
              }
 
