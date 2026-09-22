@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SECRETS = [
-  Deno.env.get("WEBHOOK_SECRET"),
+  Deno.env.get("WEBHOOK_SECRET"),f
   Deno.env.get("FAM_CRON_SECRET"),
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
 ].filter(Boolean);
@@ -624,225 +624,216 @@ async function generatePoeGapAnalysis(programmeId: number) {
     return { learner: nameById[row.learner_id] || `Learner ${row.learner_id}`, total_items: items.length, missing };
   });
 
-  const system = QCTO_SYSTEM_CONTEXT + `\nAnalyse Portfolio of Evidence completeness for a programme. List learners with missing items and priority actions to close the gaps before EISA. Keep it under 500 words.`;
+  # ApexOne `ai-generate` Security Hardening and Rollout Brief
 
-  const prompt = `Programme: ${progName}
-Learners with PoE records: ${perLearner.length}
-${perLearner.map((l) => `- ${l.learner}: ${l.total_items - l.missing.length}/${l.total_items} items complete. Missing: ${l.missing.join(", ") || "none"}`).join("\n") || "- none"}`;
+## Goal
 
-  const narrative = await callGemini(prompt, system);
-  return { programme: progName, narrative, per_learner: perLearner };
-}
+Harden `supabase/functions/ai-generate/index.ts` before continuing front-end AI rollout. Preserve all currently working AI types, Gemini 3.5 Flash-Lite, retry/backoff, QCTO context, and trusted internal `pg_net`/cron calls.
 
-async function generateFamComplianceDigest() {
-  const { data: assessors } = await supabase.from("assessors").select("*");
-  const { data: allRegs } = await supabase.from("fam_seta_registrations").select("*");
-  const { data: allDocs } = await supabase.from("fam_documents").select("*").eq("is_current", true);
-  const { data: allFollowups } = await supabase.from("fam_follow_ups").select("*").neq("status", "resolved");
+Do not merge until the function is deployed, regression-tested, and the committed source matches the deployed source.
 
-  const digest = (assessors || []).map((a: any) => {
-    const regs = (allRegs || []).filter((r: any) => r.assessor_id === a.id);
-    const docs = (allDocs || []).filter((d: any) => d.assessor_id === a.id);
-    const followups = (allFollowups || []).filter((f: any) => f.assessor_id === a.id);
-    const today = new Date();
-    const expiring = regs.filter((r: any) => r.registration_expiry_date && new Date(r.registration_expiry_date) < new Date(today.getTime() + 60 * 86400000));
-    const missingDocTypes = ["CV", "Highest Qualification"].filter((t) => !docs.some((d: any) => d.doc_type === t));
-    let rating = "Green";
-    if (expiring.length > 0 || missingDocTypes.length > 0 || followups.length > 0) rating = "Amber";
-    if (regs.length === 0 || missingDocTypes.length >= 2) rating = "Red";
-    return {
-      assessor: a.full_name || `Assessor ${a.id}`,
-      registrations: regs.length,
-      expiring_60d: expiring.length,
-      documents: docs.length,
-      missing_doc_types: missingDocTypes,
-      open_follow_ups: followups.length,
-      rating,
-    };
-  });
+## Non-negotiable security rules
 
-  const system = QCTO_SYSTEM_CONTEXT + `\nWrite a compliance digest covering all FAM (Facilitator/Assessor/Moderator) practitioners. For each flagged (Amber/Red) practitioner, state the specific issue. End with a short priority action list. Keep it under 500 words.`;
+1. Remove the `isAnonAuth` bypass. The Supabase anon/publishable key is public and must never count as authentication.
+2. Browser calls require a real Supabase access-token JWT in `Authorization: Bearer <access_token>`.
+3. Trusted internal calls may use `WEBHOOK_SECRET` or `FAM_CRON_SECRET`, but only when supplied through the dedicated secret header or an exact secret bearer token.
+4. Never use the service-role client for browser reads. A browser request must use a Supabase client carrying the caller's JWT so RLS applies.
+5. Never trust IDs alone. RLS, tenant scope, and owner scope must decide whether the caller can access a record.
+6. `smart_write` is admin-only, uses an explicit table and field allowlist, requires tenant/ownership checks, and cannot execute from `confirmed: true` alone.
+7. Keep `smart_write` UI last. Every write must show a preview, then require a server-issued, one-time confirmation token.
+8. The stray `f` after `Deno.env.get("WEBHOOK_SECRET"),` must not exist in the real file. Remove it if present.
 
-  const prompt = `FAM practitioners: ${digest.length}
-${digest.map((d) => `- ${d.assessor} [${d.rating}]: ${d.registrations} registrations (${d.expiring_60d} expiring within 60d), ${d.documents} current documents (missing: ${d.missing_doc_types.join(", ") || "none"}), ${d.open_follow_ups} open follow-ups`).join("\n")}`;
+## Required auth implementation
 
-  const narrative = await callGemini(prompt, system);
-  return { narrative, practitioners: digest };
-}
+Replace the current anonymous-key auth block with this pattern:
 
-const NARRATIVE_FIELD_LABELS: Record<string, string> = {
-  att_summary: "Attendance Summary",
-  eisa_summary: "EISA Summary",
-  time_keeping: "Time Keeping",
-  interaction: "Interaction & Participation",
-  concerns: "Concerns",
+```ts
+const authClient = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_ANON_KEY")!,
+);
+
+type RequestAuth = {
+  internal: boolean;
+  user: any | null;
+  userDb: ReturnType<typeof createClient>;
 };
 
-function narrativeFieldLabel(fieldKey: string): string {
-  if (fieldKey.startsWith("feedback_m")) return `Module ${fieldKey.slice("feedback_m".length)} Feedback`;
-  return NARRATIVE_FIELD_LABELS[fieldKey] || fieldKey;
+async function authenticateRequest(req: Request): Promise<RequestAuth> {
+  const authHeader = req.headers.get("authorization") || "";
+  const bearer = authHeader.replace(/^Bearer\\s+/i, "").trim();
+  const webhookSecret = req.headers.get("x-webhook-secret")?.trim();
+
+  const internalSecret = webhookSecret || bearer;
+  if (internalSecret && SECRETS.includes(internalSecret)) {
+    return { internal: true, user: null, userDb: supabase };
+  }
+
+  if (!bearer) throw new Error("A signed-in user session is required");
+
+  const { data, error } = await authClient.auth.getUser(bearer);
+  if (error || !data.user) throw new Error("Invalid or expired user session");
+
+  const userDb = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: `Bearer ${bearer}` } } },
+  );
+
+  return { internal: false, user: data.user, userDb };
 }
 
-async function polishNarrative(fieldKey: string, draftText: string, facts: unknown) {
-  const label = narrativeFieldLabel(fieldKey);
-
-  const system = QCTO_SYSTEM_CONTEXT + `\nYou are rewriting one short section of a QCTO monthly programme report. You will be given a mechanically-generated draft sentence and the underlying facts it was built from. Rewrite it as natural, professional flowing prose (1-3 sentences). You MUST preserve every number, percentage, name and date exactly as given — do not round, estimate, or invent any figure not present in the draft or facts. Do not add headings, labels, or markdown. Return only the rewritten paragraph, nothing else.`;
-
-  const prompt = `Section: ${label}
-Mechanically-generated draft: ${draftText}
-Underlying facts (for reference, do not restate as a list): ${JSON.stringify(facts ?? {})}`;
-
-  const polished = await callGemini(prompt, system);
-  return { field_key: fieldKey, label, polished: polished.trim() };
+function userRoles(user: any): string[] {
+  const role = user?.app_metadata?.role;
+  if (Array.isArray(role)) return role.map(String);
+  return role ? [String(role)] : [];
 }
 
-const SMART_WRITE_ALLOWED_TABLES = ["monitoring_visits", "recommendations", "fam_follow_ups", "fam_seta_registrations", "fam_documents", "attendance"];
+function isAdmin(user: any): boolean {
+  return userRoles(user).includes("admin");
+}
+```
 
-async function smartWrite(table: string, action: string, data: any, confirmed: boolean) {
-  if (!SMART_WRITE_ALLOWED_TABLES.includes(table)) throw Error(`Table ${table} not allowed for smart_write`);
-  if (action !== "insert" && action !== "update") throw Error(`Action must be insert or update, got ${action}`);
-  if (!data || typeof data !== "object") throw Error("data must be an object");
+Do not compare the caller's bearer token to `SUPABASE_ANON_KEY`. Delete this logic entirely:
 
-  const system = `You are a data validation assistant for a QCTO training provider database. Check the given record for: missing required-looking fields, invalid or inconsistent values, formatting issues (e.g. bad dates). Return ONLY valid JSON, no markdown fences: { "valid": boolean, "issues": string[], "enriched": object }. "enriched" is the same object with obvious fixes applied (e.g. trimmed whitespace, normalized date format) — do not invent data that isn't implied by the input.`;
-  const validationRaw = await callGemini(`Validate this ${table} record for a ${action}: ${JSON.stringify(data)}`, system);
+```ts
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+const isAnonAuth = secret && secret === anonKey;
+```
 
-  let validation: any;
-  try {
-    const cleaned = validationRaw.replace(/^```json\s*|```\s*$/g, "").trim();
-    validation = JSON.parse(cleaned);
-  } catch {
-    validation = { valid: true, issues: ["AI validation response could not be parsed; proceeding without enrichment"], enriched: data };
-  }
+## Read-query migration
 
-  if (!confirmed) {
-    return { preview: true, table, action, validation, original: data };
-  }
+Every generator currently using `supabase.from(...)` must be changed to accept a database client parameter and use that client for all reads:
 
-  const writeData = validation.enriched && typeof validation.enriched === "object" ? validation.enriched : data;
-  let result, error;
-  if (action === "insert") {
-    ({ data: result, error } = await supabase.from(table).insert(writeData).select());
-  } else {
-    if (!writeData.id) throw Error("update requires an id field in data");
-    const { id, ...rest } = writeData;
-    ({ data: result, error } = await supabase.from(table).update(rest).eq("id", id).select());
-  }
-  if (error) throw Error(`Write failed: ${error.message}`);
-  return { written: true, table, action, result };
+```ts
+async function generateExecutiveSummary(db = supabase) {
+  const { data } = await db.from("learners").select("*");
+  // ...
+}
+```
+
+For browser requests, call generators with `auth.userDb`. For trusted internal calls, use the service-role `supabase` client.
+
+Example router pattern:
+
+```ts
+const auth = await authenticateRequest(req);
+
+if (!auth.internal && type === "smart_write" && !isAdmin(auth.user)) {
+  return j({ ok: false, error: "smart_write is admin-only" }, 403);
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
-    });
-  }
-  if (req.method !== "POST") return j({ ok: false, error: "POST required" }, 405);
-
-  const authHeader = req.headers.get("authorization");
-  const secret = req.headers.get("x-webhook-secret") || authHeader?.replace(/^Bearer\s+/i, "");
-  const isSecretAuth = secret && SECRETS.includes(secret);
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const isAnonAuth = secret && secret === anonKey;
-
-  let verifiedUser: any = null;
-  if (!isSecretAuth && !isAnonAuth && secret) {
-    const { data: userData } = await authClient.auth.getUser(secret);
-    verifiedUser = userData?.user || null;
-  }
-
-  if (!isSecretAuth && !isAnonAuth && !verifiedUser) {
-    return j({ ok: false, error: "Unauthorized" }, 401);
-  }
-
-  try {
-    const body = await req.json();
-    const { type, client_id, visit_id, assessor_id, programme_id, learner_id, kma_domain, score, table, action, data, confirmed } = body;
-
-    let result;
-    switch (type) {
-      case "report_narrative":
-        if (!client_id) return j({ ok: false, error: "client_id required" }, 400);
-        result = await generateReportNarrative(client_id);
-        break;
-      case "visit_report":
-        if (!visit_id) return j({ ok: false, error: "visit_id required" }, 400);
-        result = await generateVisitReport(visit_id);
-        break;
-      case "document_extract":
-        if (!assessor_id) return j({ ok: false, error: "assessor_id required" }, 400);
-        result = await generateDocExtract(assessor_id);
-        break;
-      case "programme_summary":
-        if (!programme_id) return j({ ok: false, error: "programme_id required" }, 400);
-        result = await generateProgrammeSummary(programme_id);
-        break;
-      case "learner_progress":
-        if (!learner_id) return j({ ok: false, error: "learner_id required" }, 400);
-        result = await generateLearnerProgress(learner_id);
-        break;
-      case "risk_assessment":
-                result = client_id ? await generateRiskAssessment(client_id) : await generateSystemRiskScan();
-        break;
-      case "recommendation_draft":
-        if (!visit_id || !kma_domain || score === undefined) return j({ ok: false, error: "visit_id, kma_domain, score required" }, 400);
-        result = await generateRecommendationDraft(visit_id, kma_domain, score);
-        break;
-      case "executive_summary":
-        result = await generateExecutiveSummary();
-        break;
-      case "attendance_analysis":
-        if (!programme_id) return j({ ok: false, error: "programme_id required" }, 400);
-        result = await generateAttendanceAnalysis(programme_id);
-        break;
-      case "eisa_readiness_check":
-        if (!programme_id) return j({ ok: false, error: "programme_id required" }, 400);
-        result = await generateEisaReadinessCheck(programme_id);
-        break;
-      case "poe_gap_analysis":
-        if (!programme_id) return j({ ok: false, error: "programme_id required" }, 400);
-        result = await generatePoeGapAnalysis(programme_id);
-        break;
-      case "fam_compliance_digest":
-        result = await generateFamComplianceDigest();
-        break;
-      case "narrative_polish": {
-        const { field_key, draft_text, facts } = body;
-        if (!field_key || !draft_text) return j({ ok: false, error: "field_key, draft_text required" }, 400);
-        result = await polishNarrative(field_key, draft_text, facts);
-        break;
-      }
-      case "smart_write": {
-        if (!table || !action || !data) return j({ ok: false, error: "table, action, data required" }, 400);
-        if (!verifiedUser) {
-          return j({ ok: false, error: "smart_write requires a signed-in admin user token" }, 403);
-        }
-        const role = verifiedUser.app_metadata?.role;
-        if (role !== "admin") return j({ ok: false, error: "smart_write is admin-only" }, 403);
-        result = await smartWrite(table, action, data, !!confirmed);
-        break;
-      }
-      default:
-        return j({ ok: false, error: `Unknown type: ${type}` }, 400);
-    }
-
-    return j({ ok: true, type, ...result });
-  } catch (err) {
-    console.error("AI generate error:", err);
-    return j({ ok: false, error: String(err) }, 500);
-  }
-});
-
-function j(b: any, s = 200) {
-  return new Response(JSON.stringify(b), {
-    status: s,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+if (type !== "smart_write") {
+  result = await generateExecutiveSummary(auth.userDb);
 }
+```
+
+Do not leave browser generators calling the service-role client. If a generator cannot yet be converted safely, return a clear 403 rather than exposing it.
+
+## Router requirements
+
+Preserve these types:
+
+- `report_narrative`
+- `visit_report`
+- `document_extract`
+- `programme_summary`
+- `learner_progress`
+- `risk_assessment`, with `client_id` for client scope or no ID for the system scan
+- `resolution_summary`
+- `recommendation_draft`
+- `executive_summary`
+- `attendance_analysis`
+- `eisa_readiness_check`
+- `poe_gap_analysis`
+- `fam_compliance_digest`
+- `narrative_polish`
+- `smart_write`
+
+Validate required IDs and reject malformed values before querying. Do not allow arbitrary table names, RPC names, filters, or SQL from the request body.
+
+## Fix known data issues while touching the file
+
+- Use `full_name` first for assessors, then JSONB fallbacks.
+- Use one canonical client-name helper everywhere, including risk assessment.
+- Resolve programme relationships from both typed foreign keys and `fields.Programme` string arrays.
+- Do not compare a numeric client ID to a JSONB client-name field. Resolve by typed `client_id` first, then exact client-name fallback.
+- Treat status from `status`, `programme_status`, or `fields.Status`, with an explicit normalisation helper.
+- For system risk scans, build latest visits from both `programme_id` and every ID in `fields.Programme`.
+- Count EISA module completion only for explicit accepted result values. Do not treat arbitrary non-empty values such as `Pending` or `NYC` as complete.
+- Keep KMA domains exactly as follows:
+  - KMA1: Programme Implementation
+  - KMA2: Human Resources
+  - KMA3: Assessment Strategy
+  - KMA4: Progress on Implementation
+  - KMA5: General Responsiveness
+  - KMA6: E-learning
+- Keep scores and source figures exact. AI must not invent or round facts.
+
+## `smart_write` requirements
+
+Use an allowlist such as:
+
+```ts
+const SMART_WRITE_RULES = {
+  monitoring_visits: { insert: ["tenant_id", "programme_id", "fields"], update: ["fields"] },
+  recommendations: { insert: ["tenant_id", "programme_id", "fields"], update: ["fields"] },
+  fam_follow_ups: { insert: ["tenant_id", "assessor_id", "action_required", "due_date", "status"], update: ["action_required", "due_date", "status"] },
+  fam_seta_registrations: { insert: ["tenant_id", "assessor_id", "seta_name", "role", "registration_status", "registration_expiry_date"], update: ["registration_status", "registration_expiry_date", "seta_name", "role"] },
+  fam_documents: { insert: ["tenant_id", "assessor_id", "document_type"], update: ["document_type", "is_current"] },
+  attendance: { insert: ["tenant_id", "programme_id", "learner_id", "status"], update: ["status"] },
+} as const;
+```
+
+Do not accept arbitrary columns from the client. Reject unknown fields. Do not allow changing `tenant_id`, owner fields, audit fields, or record identity during updates.
+
+Preview flow:
+
+1. Validate the table, action, fields, role, tenant, ownership, and AI enrichment.
+2. Return the proposed change and a short-lived, one-time server-issued confirmation token.
+3. On the second request, require the token, bind it to the authenticated user, table, action, record, and payload hash.
+4. Consume the token before performing the write.
+5. Write only the allowlisted fields through the caller-scoped client where RLS must apply.
+6. Return the created or updated record and an audit reference.
+
+Do not treat `confirmed: true` as sufficient confirmation. Do not store confirmation tokens in source code or client-visible permanent storage.
+
+## CORS and errors
+
+Keep CORS restricted to the deployed ApexOne origins if practical. Do not use wildcard CORS for authenticated data operations unless there is a documented reason. Return generic authentication and permission errors to callers; log diagnostic detail server-side only.
+
+## Testing checklist
+
+Before opening or updating the PR:
+
+- Unauthenticated request returns 401.
+- Request with only the public anon key returns 401.
+- Expired or invalid JWT returns 401.
+- Valid user JWT can read only records permitted by RLS and owner/tenant rules.
+- Cross-owner record access is rejected or returns no record.
+- Internal secret calls still work for `pg_net` and cron.
+- Existing AI types return 200 for an authorised test user.
+- `executive_summary` and system `risk_assessment` still return valid output.
+- `resolution_summary` still returns valid output.
+- `smart_write` preview returns no database mutation.
+- `smart_write` without a server-issued token is rejected.
+- Reusing a consumed confirmation token is rejected.
+- Non-admin smart writes are rejected.
+- Unknown tables and fields are rejected.
+- Tenant/ownership checks are enforced on insert and update.
+- Retry/backoff remains active for Gemini 429 and 503 responses.
+- Deployed source and committed source are byte-for-byte equivalent, or the difference is documented.
+
+## Deployment and handoff
+
+1. Patch the full `index.ts`, not a placeholder.
+2. Run TypeScript/syntax checks.
+3. Deploy the complete function.
+4. Run the regression and security tests above.
+5. Commit the exact deployed source to the existing branch.
+6. Open a PR for review. Do not merge.
+7. Report the deployed version, tests run, remaining limitations, and any frontend calls that must temporarily wait for the JWT-scoped migration.
+
+## Important
+
+Do not continue with new tab integrations until this hardening is complete. The current function contains a service-role client behind an anon-key bypass, which is an access-control flaw even if the current tenant is small.
