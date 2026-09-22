@@ -1638,6 +1638,7 @@
                                 <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.loadAll()">&#8635; Refresh</button>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.openScopeImport()">Scope Import</button>
+        <button class="btn btn-secondary btn-sm" onclick="FAM.generateComplianceDigest()">&#10024; Compliance Digest</button>
                                 <button class="btn btn-gold btn-sm" onclick="FAM.openAddPractitioner()">+ Add practitioner</button>
                             </div>
                         </div>
@@ -1774,6 +1775,32 @@
             <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">PDF, Word, or image (JPG/PNG) — up to 10 MB.</div>
         </div>
         <div style="display:flex;gap:10px;"><button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-modal-document')">Cancel</button><button class="btn btn-gold" style="flex:1;" onclick="FAM.saveDocument()">Save</button></div>
+    </div>
+</div>
+
+<!-- FAM AI COMPLIANCE SUMMARY MODAL (per-practitioner) -->
+<div class="modal-overlay hidden" id="fam-ai-summary-modal" onclick="if(event.target===this)closeModal('fam-ai-summary-modal')">
+    <div class="modal-card" style="width:600px;max-height:85vh;display:flex;flex-direction:column;">
+        <h2 style="font-size:16px;margin-bottom:4px;">AI Compliance Summary</h2>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;" id="fam-ai-summary-sub"></p>
+        <div id="fam-ai-summary-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:16px;min-height:120px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-ai-summary-modal')">Close</button>
+            <button class="btn btn-gold" style="flex:1;" onclick="FAM.copyAISummary()">&#128203; Copy Text</button>
+        </div>
+    </div>
+</div>
+
+<!-- FAM AI COMPLIANCE DIGEST MODAL (whole registry) -->
+<div class="modal-overlay hidden" id="fam-ai-digest-modal" onclick="if(event.target===this)closeModal('fam-ai-digest-modal')">
+    <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
+        <h2 style="font-size:16px;margin-bottom:4px;">AI Compliance Digest</h2>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:16px;">All FAM practitioners &mdash; flagged issues and priority actions</p>
+        <div id="fam-ai-digest-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:16px;min-height:120px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-ai-digest-modal')">Close</button>
+            <button class="btn btn-gold" style="flex:1;" onclick="FAM.copyAIDigest()">&#128203; Copy Text</button>
+        </div>
     </div>
 </div>
 
@@ -10177,6 +10204,7 @@ const FAM = (function () {
           <div style="font-size:11px;color:var(--text-muted);">${a.id_number ? escapeHtml(a.id_number) : 'ID not captured'}</div>
         </div>
         ${statusPillHtml(overallStatus(assessorId))}
+            <button class="btn btn-secondary btn-sm" onclick="FAM.generateAssessorSummary(${assessorId})">&#10024; AI Summary</button>
       </div>
       <div class="detail-body">
         <div>
@@ -10212,6 +10240,57 @@ const FAM = (function () {
     if (!fs.loaded) { await init(); }
     renderDetail(assessorId);
   }
+
+
+let _aiSummaryText = '';
+let _aiDigestText = '';
+
+async function generateAssessorSummary(assessorId) {
+  const a = fs.assessors.find(x => String(x.id) === String(assessorId));
+  if (!a) { showToast('error', 'Practitioner not found'); return; }
+  document.getElementById('fam-ai-summary-sub').textContent = a.full_name || '';
+  document.getElementById('fam-ai-summary-body').textContent = 'Generating summary…';
+  _aiSummaryText = '';
+  openModal('fam-ai-summary-modal');
+  try {
+    const j = await callAIGenerate({ type: 'document_extract', assessor_id: Number(assessorId) }, 45000);
+    _aiSummaryText = j.summary || '';
+    document.getElementById('fam-ai-summary-body').textContent = _aiSummaryText || '(No summary text returned)';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('fam-ai-summary-body').textContent = 'Failed to generate summary: ' + (e.message || e);
+  }
+}
+
+function copyAISummary() {
+  if (!_aiSummaryText) { showToast('error', 'Nothing to copy yet'); return; }
+  navigator.clipboard.writeText(_aiSummaryText).then(
+    () => showToast('success', 'Summary copied to clipboard'),
+    () => showToast('error', 'Copy failed')
+  );
+}
+
+async function generateComplianceDigest() {
+  document.getElementById('fam-ai-digest-body').textContent = 'Generating digest for all practitioners…';
+  _aiDigestText = '';
+  openModal('fam-ai-digest-modal');
+  try {
+    const j = await callAIGenerate({ type: 'fam_compliance_digest' }, 45000);
+    _aiDigestText = j.narrative || '';
+    document.getElementById('fam-ai-digest-body').textContent = _aiDigestText || '(No digest text returned)';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('fam-ai-digest-body').textContent = 'Failed to generate digest: ' + (e.message || e);
+  }
+}
+
+function copyAIDigest() {
+  if (!_aiDigestText) { showToast('error', 'Nothing to copy yet'); return; }
+  navigator.clipboard.writeText(_aiDigestText).then(
+    () => showToast('success', 'Digest copied to clipboard'),
+    () => showToast('error', 'Copy failed')
+  );
+}
 
   // ---------- modals ----------
   function openAddPractitioner() {
@@ -10527,6 +10606,7 @@ const FAM = (function () {
     openAddDocument, openReplaceDocument, saveDocument, toggleDocHistory, viewDocument,
     claimFollowUp, dismissFollowUp, reopenFollowUp, noteFollowUp,
     openScopeImport, closeScopeImport, renderScopeImport, updateScopeReadiness, updateApproveButton, approveScope,
+        generateAssessorSummary, copyAISummary, generateComplianceDigest, copyAIDigest,
   };
 })();
 </script>

@@ -238,7 +238,7 @@ async function generateDocExtract(assessorId: number) {
     .select("*")
     .eq("assessor_id", assessorId);
 
-  const name = assessor.fields?.Name || assessor.fields?.name || `Assessor ${assessorId}`;
+  const name = assessor.full_name || assessor.fields?.Name || assessor.fields?.name || `Assessor ${assessorId}`;
 
   const system = `You are a compliance analyst reviewing FAM (Facilitator/Assessor/Moderator) practitioner documents for a South African training provider.
 Summarize the compliance status. Flag gaps: missing documents, expired registrations, unresolved follow-ups.
