@@ -8950,6 +8950,21 @@ function downloadTemplate(){
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+// Legacy (SETA unit-standard) template: same Learner Data/Attendance layout plus
+// Programme Type=Legacy and SETA columns, and a "Legacy Results" sheet with
+// per-module Formative/Summative/Logbook (instead of occupational KM/PM/WM/Exam).
+const APEX_LEGACY_TEMPLATE_B64='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';
+function downloadLegacyTemplate(){
+  const bin=atob(APEX_LEGACY_TEMPLATE_B64);
+  const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='ApexU Monthly Report Template - Legacy v1.xlsx';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function openImportLmsModal(){
   document.getElementById('modal-title').textContent='Import LMS Report';
@@ -9244,9 +9259,14 @@ function openImportModal(){
         Upload any <strong style="color:#fff">.xlsx or .xls</strong> file — scans all sheets automatically.<br>
         Blank cells are fine; fill them in manually after importing.
       </div>
-      <button class="btn btn-ghost" style="font-size:8.5pt;padding:7px 14px;white-space:nowrap" onclick="downloadTemplate()">
-        📄 Download Template
-      </button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost" style="font-size:8.5pt;padding:7px 14px;white-space:nowrap" onclick="downloadTemplate()" title="QCTO / Occupational: KM, PM, WM and Exam results per module">
+          📄 Occupational Template
+        </button>
+        <button class="btn btn-ghost" style="font-size:8.5pt;padding:7px 14px;white-space:nowrap" onclick="downloadLegacyTemplate()" title="Legacy (SETA unit standards): Formative, Summative and Logbook per module">
+          📄 Legacy Template
+        </button>
+      </div>
     </div>
     <div class="modal-field">
       <label>Excel File</label>
@@ -9465,6 +9485,38 @@ function detectMoodleBlankNameColumn(headers,dataRows){
 }
 
 // Scan one sheet and return {programmes[], learners[]}
+// ── Legacy import helpers ──
+// "Legacy" / "SETA" / "unit standard" → legacy; "Occupational" / "QCTO" → occupational; else ''.
+function _importProgType(v){
+  const s=String(v||'').toLowerCase();
+  if(/legacy|seta|unit\s*standard/.test(s))return'legacy';
+  if(/occupational|qcto/.test(s))return'occupational';
+  return'';
+}
+// Achieved/Competent/C/Yes → C ; Not Yet/NYC/No → NYC ; anything else → ''.
+function _importLegacyResult(v){
+  const s=String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
+  if(!s)return'';
+  if(/^(nyc|n|no|not yet|not yet (achieved|competent)|not achieved|not competent)$/.test(s))return'NYC';
+  if(/^(c|y|yes|a|achieved|competent|pass|passed|done|complete|completed|✓|ü)$/.test(s))return'C';
+  return'';
+}
+// Normalises a month cell to the app's "September 2026" format; '' if blank/unparseable.
+function _importReportMonth(v){
+  const s=String(v??'').trim();
+  if(!s)return'';
+  const M=_AUTO_MONTH_NAMES;
+  let m=s.match(/^([a-z]+)\.?[\s\-\/]*(\d{4})$/i);
+  if(m){const i=M.findIndex(n=>n.toLowerCase().startsWith(m[1].toLowerCase().slice(0,3)));if(i>=0)return`${M[i]} ${m[2]}`;}
+  m=s.match(/^(\d{4})[\-\/](\d{1,2})(?:[\-\/]\d{1,2})?/);
+  if(m&&+m[2]>=1&&+m[2]<=12)return`${M[+m[2]-1]} ${m[1]}`;
+  m=s.match(/^(\d{1,2})[\-\/](\d{4})$/);
+  if(m&&+m[1]>=1&&+m[1]<=12)return`${M[+m[1]-1]} ${m[2]}`;
+  const iso=parseImportDateISO(s); // Excel serials / dd/mm/yyyy etc.
+  if(iso&&/^\d{4}-\d{2}/.test(iso))return`${M[+iso.slice(5,7)-1]} ${iso.slice(0,4)}`;
+  return'';
+}
+
 function scanSheet(sheetName,rows){
   if(rows.length<2)return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
 
@@ -9586,6 +9638,7 @@ function scanSheet(sheetName,rows){
   const learners=[];
   const attendance=[];
   const eisa=[];
+  const legacy=[]; // Legacy (SETA) per-module Formative/Summative/Logbook rows
   const units=[];
   const moduleDatesMap={}; // per-module date range, keyed by `${pkey}||${moduleNumber}` — see the
                             // "Module date range" block below, near the unit-standard extraction.
@@ -9624,6 +9677,9 @@ function scanSheet(sheetName,rows){
   const hasModuleNum =colKey(headers,['module number','module','module no'])>=0;
   const hasEisaResult=colKey(headers,['km result','pm result','wm result','exam result','exam v1 result','km','pm','wm','exam','exam v1'])>=0;
   const isEisaSheet=hasModuleNum&&hasEisaResult&&(hasFirstName||hasLastName||hasFullName||hasNationalId);
+  // ── Legacy (SETA) results sheet: module number + Formative/Summative/Logbook columns ──
+  const hasLegacyResult=colKey(headers,['formative','summative','logbook','formative result','summative result','logbook result'])>=0;
+  const isLegacySheet=hasModuleNum&&hasLegacyResult&&!hasEisaResult&&(hasFirstName||hasLastName||hasFullName||hasNationalId);
 
   // ── Wide-format Attendance: one row per learner, one column PER SESSION DATE (the date
   // itself is the header text, e.g. "10/07/2026") instead of a single date+status pair per
@@ -9658,7 +9714,7 @@ function scanSheet(sheetName,rows){
   // Dedicated attendance/EISA sheets are single-purpose — don't also treat their
   // learner-identifier columns as a general learner-import sheet (would create
   // blank-programme learner records and pollute forward-fill state).
-  isLearnerSheet=isLearnerSheet&&!isAttendanceSheet&&!isEisaSheet&&!isWideAttendanceSheet&&!isWideEisaSheet;
+  isLearnerSheet=isLearnerSheet&&!isAttendanceSheet&&!isEisaSheet&&!isLegacySheet&&!isWideAttendanceSheet&&!isWideEisaSheet;
 
   // A sheet that's primarily a learner roster (has learner-identity columns) but only has
   // a bare "Programme Name" column and no SAQA ID / Client — that column is just a link
@@ -9666,14 +9722,14 @@ function scanSheet(sheetName,rows){
   // Requiring hasSaqa||hasClient here (instead of allowing hasQual alone) stops learner
   // rosters and enrolment lists from spawning blank duplicate programme stubs.
   const isProgSheet=isLearnerSheet
-    ?(hasSaqa||hasClient)&&!isAttendanceSheet&&!isEisaSheet&&!isWideAttendanceSheet&&!isWideEisaSheet
-    :(hasSaqa||hasClient||hasQual)&&!isAttendanceSheet&&!isEisaSheet&&!isWideAttendanceSheet&&!isWideEisaSheet;
+    ?(hasSaqa||hasClient)&&!isAttendanceSheet&&!isEisaSheet&&!isLegacySheet&&!isWideAttendanceSheet&&!isWideEisaSheet
+    :(hasSaqa||hasClient||hasQual)&&!isAttendanceSheet&&!isEisaSheet&&!isLegacySheet&&!isWideAttendanceSheet&&!isWideEisaSheet;
 
   // Sheets that look like admin/compliance data — skip as programme/learner source
   // (but still safe — they just produce zero records). Dedicated attendance/EISA
   // sheets are exempt since we now parse those intentionally.
   const skipSheetPatterns=/^(eisa|monitoring|compliance|recommendation|visit|summary|audit|report|log|column guide|guide)/i;
-  if(skipSheetPatterns.test(sheetName.trim())&&!isLearnerSheet&&!hasSaqa&&!isAttendanceSheet&&!isEisaSheet&&!isWideAttendanceSheet&&!isWideEisaSheet){
+  if(skipSheetPatterns.test(sheetName.trim())&&!isLearnerSheet&&!hasSaqa&&!isAttendanceSheet&&!isEisaSheet&&!isLegacySheet&&!isWideAttendanceSheet&&!isWideEisaSheet){
     return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
   }
 
@@ -9757,6 +9813,7 @@ function scanSheet(sheetName,rows){
           contact_number:contactNum,
           contact_email:contactEmail,
           status:p(['status','programme status']),
+          programme_type:_importProgType(p(['programme type','qualification type','programme category'])),
         });
       }
     }
@@ -9784,6 +9841,7 @@ function scanSheet(sheetName,rows){
           contact_number:contactNum,
           contact_email:contactEmail,
           status:p(['status','programme status']),
+          programme_type:_importProgType(p(['programme type','qualification type','programme category'])),
         });
       }
     }
@@ -9832,6 +9890,19 @@ function scanSheet(sheetName,rows){
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
       if((resolvedFirst||resolvedLast||idNumber)&&modNum){
         eisa.push({_sheet:sheetName,_prog_name:progLink,first_name:resolvedFirst,last_name:resolvedLast,id_number:idNumber,module_number:+modNum,km_result:km,pm_result:pm,wm_result:wm,exam_v1_result:examv1});
+      }
+    }
+
+    // ── Legacy results record (dedicated sheet only) ──
+    if(isLegacySheet){
+      const modNum=numFromCell(p(['module number','module','module no']));
+      const formative=_importLegacyResult(p(['formative','formative result']));
+      const summative=_importLegacyResult(p(['summative','summative result']));
+      const logbook=_importLegacyResult(p(['logbook','logbook result']));
+      const progLink=p(['programme name','program name','qualification','programme','program','course']);
+      const month=_importReportMonth(p(['report month','month']));
+      if((resolvedFirst||resolvedLast||idNumber)&&modNum&&(formative||summative||logbook)){
+        legacy.push({_sheet:sheetName,_prog_name:progLink,first_name:resolvedFirst,last_name:resolvedLast,id_number:idNumber,module_number:+modNum,formative,summative,logbook,report_month:month});
       }
     }
 
@@ -9912,7 +9983,7 @@ function scanSheet(sheetName,rows){
     }
   });
 
-  return{programmes,learners,attendance,eisa,units,moduleDates:Object.values(moduleDatesMap),facilitatorFallback:sheetFacilitatorFallback,assessorFallback:sheetAssessorFallback,clientFallback:sheetClientFallback,qualificationFallback:sheetQualificationFallback,saqaFallback:sheetSaqaFallback};
+  return{programmes,learners,attendance,eisa,legacy,units,moduleDates:Object.values(moduleDatesMap),facilitatorFallback:sheetFacilitatorFallback,assessorFallback:sheetAssessorFallback,clientFallback:sheetClientFallback,qualificationFallback:sheetQualificationFallback,saqaFallback:sheetSaqaFallback};
 }
 
 // ── Safe sheet reader — guards against corrupted/inflated used-ranges ──
@@ -9966,7 +10037,7 @@ function previewImport(input){
       }else{
         wb=XLSX.read(e.target.result,{type:'array'});
       }
-      const allProgs=[],allLearners=[],allAttendance=[],allEisa=[],allUnits=[],allModuleDates=[];
+      const allProgs=[],allLearners=[],allAttendance=[],allEisa=[],allUnits=[],allModuleDates=[],allLegacy=[];
       const sheetLog=[];
       const sheetWarnings=[];
       let wbFacilitatorFallback='',wbAssessorFallback='',wbClientFallback='',wbQualificationFallback='',wbSaqaFallback='';
@@ -9975,7 +10046,7 @@ function previewImport(input){
       wb.SheetNames.forEach(name=>{
         const ws=wb.Sheets[name];
         const rows=safeSheetRows(ws,name,sheetWarnings);
-        const{programmes,learners,attendance,eisa,units,moduleDates,facilitatorFallback,assessorFallback,clientFallback,qualificationFallback,saqaFallback}=scanSheet(name,rows);
+        const{programmes,learners,attendance,eisa,legacy,units,moduleDates,facilitatorFallback,assessorFallback,clientFallback,qualificationFallback,saqaFallback}=scanSheet(name,rows);
         if(!wbFacilitatorFallback&&facilitatorFallback)wbFacilitatorFallback=facilitatorFallback;
         if(!wbAssessorFallback&&assessorFallback)wbAssessorFallback=assessorFallback;
         if(!wbClientFallback&&clientFallback)wbClientFallback=clientFallback;
@@ -9985,12 +10056,14 @@ function previewImport(input){
         allLearners.push(...learners);
         allAttendance.push(...attendance);
         allEisa.push(...eisa);
+        allLegacy.push(...(legacy||[]));
         allUnits.push(...(units||[]));
         allModuleDates.push(...(moduleDates||[]));
-        if(programmes.length||learners.length||attendance.length||eisa.length){
+        if(programmes.length||learners.length||attendance.length||eisa.length||(legacy||[]).length){
           const parts=[`${programmes.length} programme row${programmes.length!==1?'s':''}`,`${learners.length} learner${learners.length!==1?'s':''}`];
           if(attendance.length)parts.push(`${attendance.length} attendance row${attendance.length!==1?'s':''}`);
           if(eisa.length)parts.push(`${eisa.length} EISA row${eisa.length!==1?'s':''}`);
+          if((legacy||[]).length)parts.push(`${legacy.length} legacy result row${legacy.length!==1?'s':''}`);
           sheetLog.push(`<em>${name}</em>: ${parts.join(', ')}`);
         }
       });
@@ -10204,6 +10277,9 @@ function previewImport(input){
       };
       const linkedAttendance=allAttendance.map(linkToProg);
       const linkedEisa=allEisa.map(linkToProg);
+      const linkedLegacy=allLegacy.map(linkToProg);
+      // A programme is Legacy if its Programme Type says so, or if legacy results link to it.
+      linkedLegacy.forEach(r=>{if(progMap[r._pkey]&&!progMap[r._pkey].programme_type)progMap[r._pkey].programme_type='legacy';});
 
       // Unit standard rows are already tagged with a _pkey built the same way
       // as the progMap key (client_name||saqa_id||programme_name), so they line
@@ -10230,7 +10306,7 @@ function previewImport(input){
   });
   const linkedModuleDates=Object.values(moduleDateMap);
 
-      importData={progMap,learnerMap:learnerMap,learnerRows:linkedLearners,attendanceRows:linkedAttendance,eisaRows:linkedEisa,unitsRows:linkedUnits,moduleDatesRows:linkedModuleDates};
+      importData={progMap,learnerMap:learnerMap,learnerRows:linkedLearners,attendanceRows:linkedAttendance,eisaRows:linkedEisa,legacyRows:linkedLegacy,unitsRows:linkedUnits,moduleDatesRows:linkedModuleDates};
 
       // Per-programme learner counts
       const progLearnerCounts={};
@@ -10247,6 +10323,9 @@ function previewImport(input){
       const nl=linkedLearners.length;
       const na=linkedAttendance.length;
       const ne=linkedEisa.length;
+      const nlg=linkedLegacy.length;
+      const nLegProg=Object.values(progMap).filter(p=>p.programme_type==='legacy').length;
+      const legMonths=[...new Set(linkedLegacy.map(r=>r.report_month||document.getElementById('sel-month')?.value||'').filter(Boolean))];
       const nu=linkedUnits.length;
       const nmd=linkedModuleDates.length;
 
@@ -10258,7 +10337,7 @@ function previewImport(input){
         anyFound('client_name')&&'Client',
         anyFound('programme_name')&&'Programme name',
         anyFound('saqa_id')&&'SAQA ID',
-        anyFound('qualification_code')&&'QCTO code',
+        anyFound('qualification_code')&&'Qualification code',
         anyFound('facilitator_name')&&'Facilitator',
         anyFound('assessor_name')&&'Assessor',
         anyFound('module_1_dates')&&'Programme dates',
@@ -10271,6 +10350,7 @@ function previewImport(input){
         linkedLearners.some(l=>l.phone)&&'Learner phone',
         na>0&&'Attendance',
         ne>0&&'EISA results',
+        nlg>0&&'Legacy results',
         nu>0&&'Unit standards',
         nmd>0&&'Module dates',
       ].filter(Boolean);
@@ -10291,6 +10371,8 @@ function previewImport(input){
           <div>👤 <strong style="color:#fff">${nl}</strong> learner${nl!==1?'s':''} total</div>
           ${na?`<div>🗓️ <strong style="color:#fff">${na}</strong> attendance row${na!==1?'s':''}</div>`:''}
           ${ne?`<div>📝 <strong style="color:#fff">${ne}</strong> EISA row${ne!==1?'s':''}</div>`:''}
+          ${nlg?`<div>📘 <strong style="color:#fff">${nlg}</strong> legacy result row${nlg!==1?'s':''} (Formative / Summative / Logbook)${legMonths.length?` → ${esc(legMonths.join(', '))}`:''}</div>`:''}
+          ${nLegProg?`<div>🏷️ <strong style="color:#fff">${nLegProg}</strong> programme${nLegProg!==1?'s':''} will be set to <strong style="color:#fff">Legacy</strong></div>`:''}
           ${nu?`<div>📚 <strong style="color:#fff">${nu}</strong> unit standard${nu!==1?'s':''}</div>`:''}
           ${nmd?`<div>🗓️ <strong style="color:#fff">${nmd}</strong> module date range${nmd!==1?'s':''}</div>`:''}
           ${naFac?`<div>🎓 <strong style="color:#fff">${naFac}</strong> facilitator name${naFac!==1?'s':''} → added to Assessors</div>`:''}
@@ -10526,6 +10608,75 @@ module_1_dates:pd.module_1_dates||modDates.module_1_dates||null,
       unitStandards.push(localRec);
     }
 
+    // ── 8. Programme type + Legacy results ──
+    // Programme type comes from the "Programme Type" column (or is inferred from legacy
+    // results). Legacy results live in each programme+month report draft (payload._eisa,
+    // keys {learner}_m{mod}_formative|summative|logbook), the same place the Legacy
+    // assessment grid saves to — so they're merged into that draft (local + cloud),
+    // never replacing narratives or other results already in it.
+    const legacyRows=importData.legacyRows||[];
+    let legacyApplied=0,legacySkipped=0;
+    Object.entries(progMap).forEach(([pkey,p])=>{
+      const pid=p._id;
+      if(pid&&p.programme_type)setProgrammeType(pid,p.programme_type,{persist:syncDB&&!isTempId(pid)});
+    });
+    if(legacyRows.length){
+      const fallbackMonth=document.getElementById('sel-month')?.value||`${_AUTO_MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+      const groups={};
+      for(const r of legacyRows){
+        const pid=progMap[r._pkey]?._id;
+        const _nm=(a,b)=>`${a||''} ${b||''}`.toLowerCase().replace(/\s+/g,' ').trim();
+        const enrolled=l=>enrolments.some(e=>e.learner_id===l.id&&e.programme_id===pid);
+        const lrec=pid&&(learners.find(l=>r.id_number&&l.id_number===r.id_number)
+          ||learners.find(l=>l.first_name===r.first_name&&l.last_name===r.last_name)
+          ||learners.find(l=>enrolled(l)&&_nm(l.first_name,l.last_name)===_nm(r.first_name,r.last_name)));
+        if(!lrec){legacySkipped++;continue;}
+        const month=r.report_month||fallbackMonth;
+        const g=groups[`${pid}||${month}`]||={pid,month,vals:{}};
+        if(r.formative)g.vals[legacyFormativeKey(lrec.id,r.module_number)]=r.formative;
+        if(r.summative)g.vals[legacySummativeKey(lrec.id,r.module_number)]=r.summative;
+        if(r.logbook)g.vals[logbookKey(lrec.id,r.module_number)]=r.logbook;
+      }
+      for(const g of Object.values(groups)){
+        const prog=programmes.find(x=>String(x.id)===String(g.pid));
+        const client=clients.find(c=>String(c.id)===String(prog?.client_id));
+        const key=`apex_report_${g.pid}_${g.month}`;
+        // Start from whichever copy of this month's draft is newer: local or cloud.
+        let base={},baseAt=0;
+        try{const raw=localStorage.getItem(key);if(raw){base=JSON.parse(raw)||{};baseAt=base?._meta?.savedAt||0;}}catch{}
+        if(syncDB&&!isTempId(g.pid)){
+          try{
+            const rows=await sb('drafts',`select=saved_at,payload&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${g.pid}&month=eq.${encodeURIComponent(g.month)}&limit=1`);
+            const row=rows&&rows[0];
+            if(row&&new Date(row.saved_at).getTime()>baseAt){
+              const cloud=typeof row.payload==='string'?JSON.parse(row.payload):row.payload;
+              if(cloud&&typeof cloud==='object')base=cloud;
+            }
+          }catch(e){console.warn('Legacy import: could not read cloud draft',e?.message||e);}
+        }
+        base._eisa={...(base._eisa||{}),...g.vals};
+        base._meta={...(base._meta||{}),clientId:prog?.client_id??base._meta?.clientId,clientName:client?.client_name||base._meta?.clientName||'',
+          progId:g.pid,progName:prog?.programme_name||base._meta?.progName||'',month:g.month,savedAt:Date.now()};
+        try{localStorage.setItem(key,JSON.stringify(base));}catch{}
+        if(syncDB&&TENANT_DB_ID&&!isTempId(g.pid)){
+          try{await sbUpsert('drafts',{tenant_id:TENANT_DB_ID,programme_id:g.pid,month:g.month,client_name:base._meta.clientName,programme_name:base._meta.progName,payload:base,saved_at:new Date().toISOString()});}
+          catch(e){console.warn('Legacy import: cloud draft save failed',e?.message||e);}
+        }
+        legacyApplied+=Object.keys(g.vals).length;
+        // If this programme+month report is open right now, update it in place so the
+        // next autosave (which reads the on-screen grid) can't overwrite the import.
+        if(activeProgramme&&String(activeProgramme.id)===String(g.pid)&&document.getElementById('sel-month')?.value===g.month){
+          if(!narratives._eisa)narratives._eisa={};
+          Object.entries(g.vals).forEach(([k,v])=>{
+            narratives._eisa[k]=v;
+            const el=document.querySelector(`[data-eisa="${k}"]`);
+            if(el){el.value=v;syncUsResult(el);}
+          });
+        }
+      }
+      updateDraftsCount();
+    }
+
     saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
     importData=null;
 
@@ -10556,6 +10707,7 @@ module_1_dates:pd.module_1_dates||modDates.module_1_dates||null,
     updateStepsGuide();
     document.getElementById('loading-state').style.display='none';
     setStatus(true,'Ready');
+    if(legacyRows.length)toast(`Legacy results: ${legacyApplied} mark${legacyApplied!==1?'s':''} saved to the report draft${legacySkipped?` (${legacySkipped} row${legacySkipped!==1?'s':''} skipped: learner not found)`:''}`,legacySkipped?'warn':'success',6000);
     if(syncDB){
       toast('Imported and saved to the server ✓','success',5000);
     }else{
